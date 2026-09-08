@@ -28,7 +28,7 @@ run it and how it works.
 
 ```
 npm install
-npm test          # 127 tests
+npm test          # 131 tests
 npm run dev       # http://localhost:5195
 npm run build
 ```
@@ -102,10 +102,21 @@ And fifteen helpers under the words a Django or Jinja author already searches
 for: `tojson`, `batch`, `date`, `fromnow`, `slugify`, `striptags`, `urlencode`,
 `to_js`, `to_py` and the rest.
 
+## Routing
+
+`vue-router` needs nothing from Vuython: it wants a list of paths and the
+components to show, and a Vuython component is a Vue component. A Python
+component can also call `useRoute()` through `importjs` and read the route live —
+including across a navigation that reuses the component.
+
+Nuxt builds and runs client-side. Nuxt *server* rendering is blocked, for a
+reason worth naming precisely: Nitro folds `document` to `undefined` at build
+time, and Brython's bootstrap reads it unconditionally. Plain Vue SSR works.
+
 ## What it does not do
 
 `{@const}` has no Vue equivalent to port to — Vue has no declaration tag. There
-is no `host()`, Svelte's custom-element hook, and no routing layer.
+is no `host()`, Svelte's custom-element hook.
 
 ## Where it comes from
 

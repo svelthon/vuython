@@ -28,7 +28,7 @@ run it and how it works.
 
 ```
 npm install
-npm test          # 131 tests
+npm test          # 135 tests
 npm run dev       # http://localhost:5195
 npm run build
 ```

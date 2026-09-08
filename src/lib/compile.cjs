@@ -279,10 +279,23 @@ function surface(body) {
 // The words the compiler publishes into a module's namespace. The decorators
 // only mark; the compiler has read them off the AST already, so what runs is the
 // identity.
+//
+// `locked` is declared rather than inferred. It was inferred once, from the
+// shape of the emitted value, and `bindable` — whose identity is `(v) => v` and
+// not `(f) => f` — walked straight through the lock while the other two were
+// held. A rule that reads a string to guess an intention holds only for as long
+// as the two happen to agree.
 const INJECTED = [
-    { name: 'derived', value: '() => (f) => f' },
-    { name: 'bindable', value: '() => (v) => v' },
-    { name: 'effect', value: '() => Object.assign((f) => f, { pre: (f) => f, root: (f) => f })' },
+    { name: 'derived', value: '() => (f) => f', locked: true },
+    { name: 'bindable', value: '() => (v) => v', locked: true },
+    {
+        name: 'effect',
+        value: '() => Object.assign((f) => f, { pre: (f) => f, root: (f) => f })',
+        locked: true
+    },
+    // The two bridges are helpers, not words: a module that defines its own
+    // `to_js` shadows ours, exactly as a Python module defining `list` loses the
+    // builtin.
     { name: 'to_js', value: '() => plainData' },
     { name: 'to_py', value: '() => pyData' }
 ];
@@ -290,7 +303,7 @@ const INJECTED = [
 // A locked name is Vuython's own word, not a builtin to shadow: refused rather
 // than quietly given to either side.
 function refuseLocked(declared, source) {
-    const taken = INJECTED.find((one) => one.value.includes('(f) => f') && declared.includes(one.name));
+    const taken = INJECTED.find((one) => one.locked && declared.includes(one.name));
 
     if (!taken) return;
 

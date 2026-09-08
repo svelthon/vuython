@@ -33,6 +33,21 @@ describe('what one module-level name costs', () => {
     test('and an annotation is a declared prop', () => {
         expect(script('name: str = "x"')).toContain('props: { name: { default: undefined } },');
     });
+
+    // The arrow with nothing to name is an effect, as `f()` alone is `x = f()`
+    // with nothing to keep. Both spellings of a bindable reach the same place.
+    test('the nameless arrow is an effect', () => {
+        const out = script('count = 0\n=> js_log(count)');
+
+        expect(out).toContain('watchEffect(');
+        expect(out).toContain("{ flush: 'post' }");
+    });
+
+    test('and `bindable()` is the long form of `<=>`', () => {
+        for (const source of ['value: str <=> ""', 'value: str = bindable("")']) {
+            expect(script(source), source).toContain('emits: ["update:value"],');
+        }
+    });
 });
 
 describe('the flush an effect asks for', () => {
@@ -81,8 +96,24 @@ describe('what the namespace has to carry', () => {
 });
 
 describe('what the compiler refuses', () => {
-    test('one of its own words, redefined', () => {
-        expect(() => script('effect = 1')).toThrow(/one of Vuython's own words/);
+    // All three, not the two whose emitted identity happens to be spelled
+    // `(f) => f`: `bindable` is `(v) => v`, and it escaped the lock for as long
+    // as the lock was inferred from that string.
+    test('any one of its own words, redefined', () => {
+        for (const word of ['derived', 'bindable', 'effect']) {
+            expect(() => script(`${word} = 1`), word).toThrow(/one of Vuython's own words/);
+        }
+    });
+
+    // And the helpers are not words: a module defining its own `to_js` shadows
+    // ours, as a Python module defining `list` loses the builtin.
+    test('but not a helper, which is shadowable', () => {
+        const out = script('to_js = 1');
+
+        // The name is still bound — it is the author's state now — and what is
+        // gone is the injection behind it.
+        expect(out).toContain("bind(__py, 'to_js', () => __ref_to_js.value");
+        expect(out).not.toContain('() => plainData');
     });
 
     test('an arrow indented under something', () => {

@@ -10,4 +10,10 @@ export const twice = (fn, value) => `${fn(value)} ${fn(value)}`;
 // JavaScript one — `half(1) * 2` raises JavascriptError if it does not.
 export const half = (n) => n / 2;
 
+// A promise, for the one thing an `async def` exists to do.
+export const delay = (value, ms) =>
+    new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
+export const fail = (why) => Promise.reject(new Error(why));
+
 export default (name) => `default:${name}`;

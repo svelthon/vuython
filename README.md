@@ -28,7 +28,7 @@ run it and how it works.
 
 ```
 npm install
-npm test          # 116 tests
+npm test          # 127 tests
 npm run dev       # http://localhost:5195
 npm run build
 ```
@@ -82,7 +82,11 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
 | `importjs X from "./X.vue"` | a JavaScript import — and a component registration |
 | `import panier` | a shared `.py`, whose names are refs at module scope |
 | `__all__ = [...]` | what the module hands JavaScript |
+| `__js__ = {...}` | the same, for a `.py` that needs JavaScript |
 | `(open := not open)` | an assignment inside a handler |
+| `@directive` on a `def` | a `v-` name that gets the element |
+| `props_id()` | Vue's `useId()` |
+| `async def` | run on Brython's own loop, `await` and all |
 
 In the template, the Python is Python: `{{ notes }}` renders `[12, 15, 8]` and
 not `12,15,8`, `v-if="notes"` is false for an empty list, `v-for` walks a dict or
@@ -100,9 +104,8 @@ for: `tojson`, `batch`, `date`, `fromnow`, `slugify`, `striptags`, `urlencode`,
 
 ## What it does not do
 
-`{@const}` has no Vue equivalent to port to. There is no `__js__`, no
-`props_id()`, no `host()`, no routing layer, and HMR invalidates the generated
-module and no more.
+`{@const}` has no Vue equivalent to port to — Vue has no declaration tag. There
+is no `host()`, Svelte's custom-element hook, and no routing layer.
 
 ## Where it comes from
 

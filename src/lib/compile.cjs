@@ -141,6 +141,37 @@ function declaredExports(body) {
     return null;
 }
 
+// `__js__ = {"./helpers.js": ["shout"]}` — the JavaScript a plain `.py` needs.
+//
+// A module has no markup, so it never asks for the three shapes that are
+// template concerns: a default export (a child component), a stylesheet imported
+// for its effect, a namespace for `<Dialog.Root>`. Only the named form is left,
+// which is all a module ever wants — so this can stay real Python, read off the
+// AST, where `importjs` had to become a keyword.
+function declaredJsImports(body) {
+    for (const node of body) {
+        if (!(node instanceof $B.ast.Assign)) continue;
+        if (!node.targets.some((t) => t instanceof $B.ast.Name && t.id === '__js__')) continue;
+        if (!node.value || !node.value.keys) continue;
+
+        const modules = [];
+
+        node.value.keys.forEach((key, index) => {
+            const names = (node.value.values[index].elts || [])
+                .map((one) => (one instanceof $B.ast.Constant ? one.value : null))
+                .filter((one) => typeof one === 'string' && /^[A-Za-z_$][\w$]*$/.test(one));
+
+            if (key instanceof $B.ast.Constant && names.length) {
+                modules.push({ from: key.value, names });
+            }
+        });
+
+        return modules;
+    }
+
+    return [];
+}
+
 // `doubled => count * 2` — a name bound to an expression that re-runs, which is
 // the arrow Svelthon already carries. Nothing about it is Svelte's: it names a
 // value computed from other names, and Vue calls that a `computed`.
@@ -512,6 +543,9 @@ function surface(body) {
                     arity: ((node.args && node.args.args) || []).length,
                     ...(pre ? { pre: true } : {}),
                     ...(root ? { root: true } : {}),
+                    // A directive is an ordinary function that is *also*
+                    // reachable from the template under a `v-` name.
+                    ...(hasDecorator(node, 'directive') ? { directive: true } : {}),
                     // `@export` leaves the function where it was: it is an
                     // ordinary function that is *also* reachable from a parent
                     // holding a ref to the instance.
@@ -694,9 +728,18 @@ function compile(
         `}`
     ].join('\n');
 
+    // The two declarations meet here, in one shape: `__js__` is the module's and
+    // only ever names, `importjs` is the component's and covers all five forms.
     const surfaced = {
         props, bindables, state, funcs, deriveds, effects, inspects, declared, title,
-        jsImports: lifted.imports,
+        jsImports: [
+            ...declaredJsImports(root._ast.body).map((one) => ({
+                from: one.from,
+                kind: 'named',
+                entries: one.names.map((n) => ({ name: n, local: n }))
+            })),
+            ...lifted.imports
+        ],
         declaredNames: declaredExports(root._ast.body)
     };
 
@@ -897,18 +940,24 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         .concat(lifecycle('on_mount') ? ['onMounted'] : [])
         .concat(lifecycle('on_destroy') ? ['onUnmounted'] : [])
         .concat(injectable({ name: 'provide', component: true }, declared, true) ? ['provide as __provide'] : [])
-        .concat(injectable({ name: 'inject', component: true }, declared, true) ? ['inject as __inject'] : []);
+        .concat(injectable({ name: 'inject', component: true }, declared, true) ? ['inject as __inject'] : [])
+        .concat(injectable({ name: 'props_id', component: true }, declared, true) ? ['useId as __useId'] : []);
 
     // What `@export` marks: an ordinary function that is *also* reachable from a
     // parent holding a ref to this instance. Vue calls that `expose`, and it is
     // the only way out of a component that is not a prop or an event.
     const exposed = written.filter((f) => f.exposed);
 
+    // And what `@directive` marks. The object is static — Vue reads it off the
+    // component, not off an instance — so it carries the *name* and looks the
+    // function up through `binding.instance` when a hook fires.
+    const directives = written.filter((f) => f.directive);
+
     return [
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
         `import { bind, hide, track, follow, template, pyError, pyEvent, plainData, pyData,` +
-            ` jsCall, writeAttr, writeItem, ticking, __pybridge, NONE } from 'vuython/runtime';`,
+            ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE } from 'vuython/runtime';`,
         ...jsImports.map(jsImportLine),
         ``,
         `export default {`,
@@ -918,6 +967,13 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         // binding it can see. So an imported child has to be registered, and
         // this is the line that lets a Vuython component name another one.
         ...(components.length ? [`  components: { ${components.join(', ')} },`] : []),
+        ...(directives.length
+            ? [
+                  `  directives: { ${directives
+                      .map((d) => `${d.name}: pyDirective('${d.name}', ${lineOffset})`)
+                      .join(', ')} },`
+              ]
+            : []),
         // Declared, not inferred: Vue routes an attribute to `attrs` unless a
         // prop of that name exists, and an annotation is exactly the author
         // saying one does.

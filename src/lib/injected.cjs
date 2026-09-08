@@ -43,6 +43,12 @@ const INJECTED = [
     // else, so a component exposes nothing unless it says so.
     { name: 'export', value: '() => (f) => f', component: true, locked: true },
 
+    // `@directive` on a def: a Python function that gets the element itself,
+    // under Vue's `v-` prefix. The contract is Svelte's action, which is the one
+    // a reader arriving from Svelthon knows — node and value in, destructor
+    // out — mapped onto Vue's three hooks.
+    { name: 'directive', value: '() => (f) => f', component: true, locked: true },
+
     // `inspect(count, message)` — a console.log that re-runs on its own. The
     // values have to be *read again* on every change, so they cannot be handed
     // over already read; the arguments go into a lambda, and calling it re-reads
@@ -249,6 +255,12 @@ const INJECTED = [
             return encodeURIComponent(__pybridge.str(value));
         }`
     },
+
+    // Vue's `useId()`, whose name follows theirs the way `provide` does. It is
+    // not a prop — the parent never passes it — but it is a value an instance
+    // has and a template needs: the `id` that joins a `<label>` to its input,
+    // stable across server and client so hydration does not object.
+    { name: 'props_id', value: '() => __useId', component: true },
 
     // Context is per component subtree, where a module is per application. Both
     // are called while an instance initialises, which is exactly when the Python

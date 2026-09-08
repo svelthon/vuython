@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { relative, resolve, dirname } from 'node:path';
 import { readFileSync, existsSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { overTemplate, pythonExpressions, collector, renameModels } from './markup.js';
 

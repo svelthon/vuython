@@ -441,19 +441,51 @@ export function schedule(result, where, lineOffset = 0) {
     if (!aio || result === undefined || result === null) return result;
 
     // Compared in JavaScript rather than through aio.iscoroutine(): this runs on
-    // every call into Python, template expressions included.
+    // every call into Python, template expressions included, and a Brython call
+    // here costs more than the check saves.
     if ($B.get_class(result) !== $B.coroutine) return result;
 
-    return new Promise((resolve, reject) => {
+    // What the caller gets back is a promise, so an `async def` can be awaited
+    // by whoever called it. `run(coro, onsuccess, onerror)`: its default onerror
+    // only logs, so an exception raised inside a coroutine would reach nothing
+    // at all — no error event, no overlay.
+    let watched = false;
+
+    const promise = new Promise((resolve, reject) => {
         $B.$getattr(aio, 'run')(
             result,
             (value) => {
                 $B.leave_frame(); // what Brython's own default does
                 resolve(value);
             },
-            (error) => reject(pyError(error, where, lineOffset))
+            (error) => {
+                const failure = pyError(error, where, lineOffset);
+                reject(failure);
+
+                // An event handler's return value is dropped on the floor, so
+                // nobody is there to catch this one. Rethrowing from a timeout
+                // turns it into a genuine uncaught error, the way the
+                // synchronous path already behaves — but only when the caller
+                // really did ignore the promise.
+                setTimeout(() => {
+                    if (!watched) throw failure;
+                });
+            }
         );
     });
+
+    const settle = promise.then.bind(promise);
+
+    // Handled here so the browser does not *also* report an unhandled
+    // rejection: reporting is this function's job, and it does it above.
+    settle(undefined, () => {});
+
+    promise.then = (...handlers) => {
+        watched = true;
+        return settle(...handlers);
+    };
+
+    return promise;
 }
 
 // What a Python function hands back to something outside Python.
@@ -767,7 +799,16 @@ export function template(fn, where, lineOffset = 0) {
     if (wrapped === undefined) {
         wrapped = (...args) => {
             try {
-                return inTemplate(() => fn(...args));
+                // Scheduled, because a handler written `@click="charger()"`
+                // becomes an inline statement whose *value* is the call's
+                // result. An `async def` returns a coroutine there, and Vue
+                // drops a statement's value — so without this the click ran the
+                // body up to nothing at all and said nothing about it.
+                //
+                // Free on everything else: `schedule` compares the class in
+                // JavaScript and returns at once for a value that is not a
+                // coroutine, which is every other template expression.
+                return schedule(inTemplate(() => fn(...args)), where, lineOffset);
             } catch (error) {
                 throw pyError(error, where, lineOffset);
             }
@@ -777,6 +818,41 @@ export function template(fn, where, lineOffset = 0) {
     }
 
     return wrapped;
+}
+
+// `v-highlight="colour"` — a Python function that gets the element itself.
+//
+// Vue's contract is an object of hooks, and it is read from the `directives`
+// option, which is **static**: it belongs to the component, not to an instance.
+// The Python function is the opposite — it lives in a namespace one `setup()`
+// built. `binding.instance` is what joins them: Vue hands every hook the
+// component instance the directive was used in, and reading a name off that
+// instance goes through the accessor to the very function that instance defined.
+//
+// The contract this gives Python is Svelte's action, which is the one a reader
+// arriving from Svelthon already knows: called with the node and the value,
+// re-called when the value moves, and whatever it returns is its destructor.
+// Mapped onto Vue's three hooks, which is exactly what they are for.
+const teardowns = new WeakMap();
+
+export function pyDirective(name, lineOffset = 0) {
+    const stop = (el) => {
+        const previous = teardowns.get(el);
+
+        if (typeof previous === 'function') previous();
+        teardowns.delete(el);
+    };
+
+    const run = (el, binding) => {
+        stop(el);
+
+        const fn = binding.instance && binding.instance[name];
+        const result = pyEvent(fn, lineOffset)(el, binding.value);
+
+        if (typeof result === 'function') teardowns.set(el, pyEvent(result, lineOffset));
+    };
+
+    return { mounted: run, updated: run, unmounted: stop };
 }
 
 // A module's namespace, published under its Python module name, so another

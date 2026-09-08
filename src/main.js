@@ -1,14 +1,7 @@
 import { createApp } from 'vue';
 
 import App from './App.vue';
-import Notes from './Notes.vue';
-import Greeting from './Greeting.vue';
-import Ticker from './Ticker.vue';
-import Field from './Field.vue';
 
-createApp(App)
-    .component('Notes', Notes)
-    .component('Greeting', Greeting)
-    .component('Ticker', Ticker)
-    .component('Field', Field)
-    .mount('#app');
+// The whole of the JavaScript in this project. Every component names its own
+// children with `importjs`, so nothing has to be registered here.
+createApp(App).mount('#app');

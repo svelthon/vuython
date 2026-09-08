@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
-import { relative } from 'node:path';
+import { relative, resolve, dirname } from 'node:path';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 
 import { overTemplate, pythonExpressions, collector, renameModels } from './markup.js';
 
@@ -17,6 +18,21 @@ const nameFor = (filename) => relative(process.cwd(), filename || 'Component').r
 
 const SCRIPT = /<script([^>]*)\blang=["']python["']([^>]*)>([\s\S]*?)<\/script>/i;
 
+// The generated module, behind the imports it needs evaluated first.
+//
+// A source map's `mappings` is delta-encoded per generated line, lines separated
+// by `;`, so the prelude costs one `;` per line it adds — get that wrong and a
+// debugger opens the file that many lines off. A module importing nothing is
+// left alone rather than gaining an empty first line.
+function withPrelude(module, map, prelude) {
+    if (!prelude) return { code: module, map };
+
+    const lead = `${prelude}\n`;
+    const lines = lead.split('\n').length - 1;
+
+    return { code: lead + module, map: { ...map, mappings: ';'.repeat(lines) + map.mappings } };
+}
+
 // Vue has no preprocessor hook. Svelte's `preprocess` is an API of the compiler
 // itself, called before it parses; here the same place is a Vite plugin that
 // runs `enforce: 'pre'`, so `@vitejs/plugin-vue` receives a component that is
@@ -25,17 +41,109 @@ const SCRIPT = /<script([^>]*)\blang=["']python["']([^>]*)>([\s\S]*?)<\/script>/
 // Which is the more portable of the two, and worth saying plainly: what Svelthon
 // needed from Svelte was a documented hook. What Vuython needs from Vue is
 // nothing at all.
-export function vuython() {
+export function vuython(options = {}) {
+    // Mirrors PYTHONPATH: the directories searched for the `.py` a component
+    // imports, after its own. Without it, `import panier` only ever resolves to
+    // a sibling file — and a component that reached the module some other way
+    // would appear to work purely by load order.
+    const searchPath = options.path || [];
+
+    // A `.py` is served on every request in dev, and compiling Python is the
+    // expensive half. Keyed on mtime, so an edit still recompiles.
+    const modules = new Map();
+
+    const compileModule = (file) => {
+        const stamp = statSync(file).mtimeMs;
+        const cached = modules.get(file);
+
+        if (cached && cached.stamp === stamp) return cached.result;
+
+        const source = readFileSync(file, 'utf8');
+        const result = compile(source, nameFor(file), relative(process.cwd(), file), {
+            module: true,
+            sourceContent: source
+        });
+
+        modules.set(file, { stamp, result });
+        return result;
+    };
+
+    // `import panier` → the file it names, looked up in the importer's own
+    // directory first, then along the configured path.
+    const pythonImports = (names, fromDirectory) =>
+        names
+            .flatMap(
+                (one) =>
+                    [fromDirectory, ...searchPath]
+                        .map((directory) => resolve(directory, `${one}.py`))
+                        .find((candidate) => existsSync(candidate)) || []
+            )
+            .map((path) => `import ${JSON.stringify(path)};`)
+            .join('\n');
+
     return {
         name: 'vuython',
         enforce: 'pre',
 
-        resolveId(id) {
+        // Every line of Python is compiled at build time, so the *compiler* half
+        // of Brython is dead weight in the bundle — and it is more than half.
+        // The vendored runtime-only build is the same file with `py2js` and the
+        // parser removed; nothing that ships can reach them.
+        //
+        // Only for a build: `vite dev` keeps the full one, because that is where
+        // a compile error has to be able to say something.
+        config(_, { command }) {
+            if (command !== 'build') return;
+
+            return {
+                resolve: {
+                    alias: [
+                        {
+                            // Anchored at both ends: with a regular expression
+                            // Vite replaces only what matched, so a pattern
+                            // covering the tail alone would leave `../../` in
+                            // front of an absolute path.
+                            find: /^.*vendor\/brython\.js$/,
+                            replacement: fileURLToPath(
+                                new URL('../../vendor/brython_runtime.js', import.meta.url)
+                            )
+                        }
+                    ]
+                }
+            };
+        },
+
+        resolveId(id, importer) {
             if (id.startsWith(VIRTUAL_PREFIX)) return '\0' + id;
+
+            // 'pre' matters here: Vite's own resolver would otherwise claim
+            // `./panier.py` as a plain file and hand its Python to the JS parser.
+            if (id.endsWith('.py') && (id.startsWith('.') || id.startsWith('/'))) {
+                const direct = importer ? resolve(dirname(importer), id) : resolve(id);
+
+                if (existsSync(direct)) return direct;
+            }
         },
 
         load(id) {
-            if (id.startsWith('\0' + VIRTUAL_PREFIX)) return generated.get(id.slice(1));
+            if (id.startsWith('\0' + VIRTUAL_PREFIX)) {
+                const entry = generated.get(id.slice(1));
+
+                return entry && (entry.map ? { code: entry.code, map: entry.map } : entry.code);
+            }
+            if (!id.endsWith('.py')) return;
+
+            const { script, module, map, imports } = compileModule(id);
+
+            // A `.py` may import another one. Same prelude a component gets: the
+            // imported namespaces have to be registered before init() runs.
+            generated.set(
+                VIRTUAL_PREFIX + nameFor(id),
+                withPrelude(module, map, pythonImports(imports, dirname(id)))
+            );
+
+            this.addWatchFile(id);
+            return script;
         },
 
         transform(code, id) {
@@ -68,10 +176,16 @@ export function vuython() {
             const compiled = compile(script[3], name, source, {
                 defs,
                 lineOffset,
-                title: (source.split('/').pop() || '').replace(/\.vue$/, '')
+                title: (source.split('/').pop() || '').replace(/\.vue$/, ''),
+                // The whole file, so a debugger opens the .vue itself rather
+                // than the fragment between its script tags.
+                sourceContent: code
             });
 
-            generated.set(VIRTUAL_PREFIX + name, compiled.module);
+            generated.set(
+                VIRTUAL_PREFIX + name,
+                withPrelude(compiled.module, compiled.map, pythonImports(compiled.imports, dirname(file)))
+            );
 
             // The content is JavaScript now, so the tag must stop claiming
             // otherwise: every tool downstream reads the attribute.

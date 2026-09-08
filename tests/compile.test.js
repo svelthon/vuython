@@ -132,3 +132,73 @@ test('a syntax error names the line, counted from the file', () => {
         /vuython — .*Probe\.vue:5/
     );
 });
+
+// A source map, so a debugger opens the .vue rather than the JavaScript Brython
+// generated from it. The mapping is read out of the `$B.set_lineno` markers the
+// codegen plants, and every pass upstream is careful to preserve line numbers —
+// which is why `importjs` blanks its line instead of removing it.
+describe('the source map', () => {
+    const decode = (mappings) =>
+        mappings.split(';').map((segment) => {
+            if (!segment) return null;
+
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            const values = [];
+            let value = 0;
+            let shift = 0;
+
+            for (const char of segment) {
+                const digit = chars.indexOf(char);
+                value += (digit & 31) << shift;
+
+                if (digit & 32) {
+                    shift += 5;
+                } else {
+                    values.push(value & 1 ? -(value >> 1) : value >> 1);
+                    value = shift = 0;
+                }
+            }
+
+            return values[2];
+        });
+
+    test('names the file and carries its text', () => {
+        const { map } = compile('x = 1', 'Probe', 'src/Probe.vue', { sourceContent: '<whole file>' });
+
+        expect(map.sources).toEqual(['src/Probe.vue']);
+        expect(map.sourcesContent).toEqual(['<whole file>']);
+    });
+
+    // Line 3 of the Python, in a file whose script tag starts on line 6.
+    test('and points at the line the author wrote', () => {
+        const { map } = compile('a = 1\nb = 2\nc = 3', 'Probe', 'Probe.vue', { lineOffset: 6 });
+        const lines = decode(map.mappings).filter((one) => one !== null);
+
+        // Deltas, decoded back to absolute: the first statement is Python line
+        // 1, which is file line 7.
+        let at = 0;
+        const absolute = lines.map((delta) => (at += delta));
+
+        expect(absolute[0]).toBe(6);
+        expect(Math.max(...absolute)).toBe(8);
+    });
+});
+
+// `__all__` is Python's own way of saying what a module exports.
+describe('__all__', () => {
+    const moduleOf = (src) => compile(src, 'Store', 'store.py', { module: true }).script;
+
+    test('narrows what a module hands JavaScript', () => {
+        const out = moduleOf('__all__ = ["a"]\n\ndef a():\n    pass\n\ndef b():\n    pass');
+
+        expect(out).toContain('export const a =');
+        expect(out).not.toContain('export const b =');
+    });
+
+    // An ES module has no live named export, so state exported by value would be
+    // a snapshot that never moves again — silently, which is the one behaviour
+    // worth refusing outright.
+    test('and refuses a name that is not a function', () => {
+        expect(() => moduleOf('__all__ = ["total"]\n\ntotal = 0')).toThrow(/stays live/);
+    });
+});

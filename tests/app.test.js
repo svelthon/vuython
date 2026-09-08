@@ -3,21 +3,20 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
 import App from '../src/App.vue';
-import Notes from '../src/Notes.vue';
-import Greeting from '../src/Greeting.vue';
-import Ticker from '../src/Ticker.vue';
 import Field from '../src/Field.vue';
 
-const page = () =>
-    mount(App, { global: { components: { Notes, Greeting, Ticker, Field } } });
+// Nothing registered from the outside: App names its own children with
+// `importjs`, which is both a Python binding and a `components` entry.
+const page = () => mount(App);
 
-// The whole page, assembled: five components, every one of them Python, and the
-// only JavaScript in the project is the eleven lines of main.js.
+// The whole page, assembled: six components, every one of them Python, and the
+// only JavaScript in the project is the three lines of main.js.
 test('the demo page renders', () => {
     const html = page().html();
 
     expect(html).toContain('Bonjour Florent!');
     expect(html).toContain('moyenne : 11.7');
+    expect(html).toContain('lentilles : 3');
 });
 
 // A prop down: the parent's `qui` is a Python name, the child's `name` is

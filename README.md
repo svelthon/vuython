@@ -21,14 +21,14 @@
 `notes.append(15)` and nothing after it: no copy, no reassignment, no proxy. The
 average on screen follows.
 
-This is a **proof of concept**, built in one session to answer one question about
-Vue. What follows is how to run it and how it works.
+Built to answer one question about Vue, then filled in. What follows is how to
+run it and how it works.
 
 ## Run it
 
 ```
 npm install
-npm test          # 64 tests
+npm test          # 116 tests
 npm run dev       # http://localhost:5195
 npm run build
 ```
@@ -75,6 +75,14 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
 | `@effect.root` | `effectScope()`, the decorated name reading as its stopper |
 | `def on_mount()` | `onMounted` |
 | `def on_destroy()` | `onUnmounted` |
+| `@export` on a `def` | `defineExpose` — what a parent reaches through a ref |
+| `f = export(lambda: …)` | the same, in one line |
+| `provide(k, v)` / `inject(k)` | Vue's own, spelled the Python way |
+| `inspect(*values)` | a console.log that re-runs, dropped in a production build |
+| `importjs X from "./X.vue"` | a JavaScript import — and a component registration |
+| `import panier` | a shared `.py`, whose names are refs at module scope |
+| `__all__ = [...]` | what the module hands JavaScript |
+| `(open := not open)` | an assignment inside a handler |
 
 In the template, the Python is Python: `{{ notes }}` renders `[12, 15, 8]` and
 not `12,15,8`, `v-if="notes"` is false for an empty list, `v-for` walks a dict or
@@ -82,7 +90,19 @@ a generator, and `pep.title` finds a key when there is no attribute.
 
 `v-model="entry"` needs no rewriting at all: Vue compiles it to
 `_ctx.entry = $event`, and `entry` is a property of the very object `setup()`
-returned.
+returned. The same goes for a slot's scope, a `v-for` that destructures a dict by
+key, and `v-model` over a list of checkboxes — three things Svelthon had to build
+and Vuython inherits.
+
+And fifteen helpers under the words a Django or Jinja author already searches
+for: `tojson`, `batch`, `date`, `fromnow`, `slugify`, `striptags`, `urlencode`,
+`to_js`, `to_py` and the rest.
+
+## What it does not do
+
+`{@const}` has no Vue equivalent to port to. There is no `__js__`, no
+`props_id()`, no `host()`, no routing layer, and HMR invalidates the generated
+module and no more.
 
 ## Where it comes from
 

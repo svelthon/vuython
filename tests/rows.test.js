@@ -23,10 +23,10 @@ test('and an attribute still wins over a key', () => {
 test('a nested container mutated in place still moves the page', async () => {
     const page = mount(Rows);
 
-    expect(page.get('p').text()).toContain('4');
+    expect(page.get('p').text()).toContain('4 — 2');
 
     await page.findAll('li')[0].get('button').trigger('click');
 
     expect(page.findAll('li')[0].text()).toContain('lentilles : 4');
-    expect(page.get('p').text()).toContain('5');
+    expect(page.get('p').text()).toContain('5 — 2');
 });

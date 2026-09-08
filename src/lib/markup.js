@@ -77,6 +77,98 @@ const REFERENCE = /^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/;
 
 const IDENTIFIER = /[A-Za-z_]\w*/g;
 
+// `@click="open := not open"` — an assignment inside an expression, and the
+// third of the dialect's bindings.
+//
+// Vue writes `@click="open = !open"` and every one of its examples does. Python
+// has no assignment expression except the walrus, and the walrus is real Python
+// with the right meaning here: bind a name from inside an expression. It is
+// allowed in a handler and nowhere else, because a handler is the one place a
+// template is *doing* something rather than reading.
+//
+// Two things Python's own grammar refuses are allowed here — an attribute and a
+// subscript target — because Vue's `=` takes all three and `v-model` already
+// does.
+const walk = (text, visit) => {
+    let depth = 0;
+    let quote = null;
+
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+
+        if (quote) {
+            if (c === '\\') i++;
+            else if (c === quote) quote = null;
+            continue;
+        }
+
+        if (c === '"' || c === "'") quote = c;
+        else if ('([{'.includes(c)) depth++;
+        else if (')]}'.includes(c)) depth--;
+        else if (depth === 0) visit(i, c);
+    }
+};
+
+// The `:=` at depth zero, and the commas that separate a group of them.
+function splitWalrus(text) {
+    const parts = [];
+    let cut = 0;
+
+    walk(text, (i, c) => {
+        if (c === ',') {
+            parts.push(text.slice(cut, i));
+            cut = i + 1;
+        }
+    });
+
+    parts.push(text.slice(cut));
+    return parts;
+}
+
+function assignment(part) {
+    let at = -1;
+
+    walk(part, (i, c) => {
+        if (at === -1 && c === ':' && part[i + 1] === '=' && part[i - 1] !== ':') at = i;
+    });
+
+    if (at === -1) return null;
+
+    const target = part.slice(0, at).trim();
+    const value = part.slice(at + 2).trim();
+
+    if (!value) return null;
+
+    if (/^[A-Za-z_]\w*$/.test(target)) return `__assign('${target}', ${value})`;
+
+    // `row.qty := row.qty + 1`, and `d[k] := v`. Split from the right, so
+    // `a.b.c` writes `c` on `a.b`.
+    const dotted = target.match(/^([\s\S]+)\.([A-Za-z_]\w*)$/);
+    if (dotted) return `__setattr(${dotted[1]}, '${dotted[2]}', ${value})`;
+
+    const keyed = target.match(/^([\s\S]+?)\[([\s\S]+)\]$/);
+    if (keyed) return `__setitem(${keyed[1]}, ${keyed[2]}, ${value})`;
+
+    return null;
+}
+
+// The whole expression, with every walrus in it rewritten. Returns the text
+// untouched when there is none, so a handler that only calls a function costs
+// nothing.
+export function walrus(expression) {
+    if (!expression.includes(':=')) return expression;
+
+    const parts = splitWalrus(expression);
+    const rewritten = parts.map((part) => {
+        const found = assignment(part);
+        return found === null ? part : found;
+    });
+
+    // A group returns its last value, as a Python tuple would, so `{{ count }}`
+    // beside it still reads afterwards.
+    return rewritten.length > 1 ? `(${rewritten.join(', ')})[-1]` : rewritten[0];
+}
+
 // `row in rows`, `(row, i) in rows`, `[k, v] of d.items()`. Everything before
 // the keyword is Vue's to compile and stays JavaScript; everything after it is
 // Python and is lifted.
@@ -278,9 +370,12 @@ function rewriteAttribute(name, value, call, opened) {
         // it must be handed is a JavaScript function. Anything else is an inline
         // statement, and Vue wraps it in `$event => { … }` itself — which is
         // where the event comes from, and why `event` is a parameter.
+        //
+        // The walrus is read here and only here: a handler is the one place a
+        // template does something rather than reads.
         return REFERENCE.test(value.trim())
             ? `__event(${call(value, null)})`
-            : call(value, null, ['event'], ['$event']);
+            : call(walrus(value), null, ['event'], ['$event']);
     }
 
     const wrapper = wrapperFor(name);

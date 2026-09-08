@@ -4,6 +4,7 @@ import './globals.js';
 import '../../vendor/brython.js';
 import '../../vendor/sys.js';
 import './boot.js';
+import { shallowRef } from 'vue';
 
 // Python's None, so a prop the parent never passed reads as None rather than
 // leaking JavaScript's undefined into Python.
@@ -92,6 +93,14 @@ export const __pybridge = {
     spread(value) {
         if (value === null || value === undefined || typeof value !== 'object') return value;
         return { ...value };
+    },
+
+    // A JavaScript array handed back to Python. A list *is* an array in Brython,
+    // but not every array is a list: one built here — by `.slice()`, say — reads
+    // as a `JavascriptArray`, which prints `[A, B]` where Python prints
+    // `['A', 'B']`.
+    list(items) {
+        return _b_.list.$factory(items);
     }
 };
 
@@ -291,7 +300,29 @@ function mark(value, bumps, reads) {
 // are the same ref — `triggerRef(r)` fires the dep that `r.value` registers —
 // where Svelte needed a second signal beside the value, because `$state.raw`
 // drops a write whose value is unchanged by `===`.
+// A value written into a Python name from the JavaScript side.
+//
+// `v-model` on a group of checkboxes hands the name a **JavaScript array**, and
+// an array is not a list: Brython reads one it did not make as a
+// `JavascriptArray`, which prints `[riz, sel]` where Python prints
+// `['riz', 'sel']` — and answers `AttributeError` to `.append`.
+//
+// Told apart by `ob_type`, which every Brython value carries and no array from
+// JavaScript has. So a list written from Python crosses untouched, and one
+// written by a directive becomes what the author will reach for.
+//
+// Only arrays. A plain object would have to become a dict, and a *Python* object
+// is a plain object too — converting those would turn every instance into a
+// dictionary of its own internals.
+function adopt(value) {
+    return Array.isArray(value) && value.ob_type === undefined
+        ? _b_.list.$factory(value)
+        : value;
+}
+
 export function track(value, bump, read) {
+    value = adopt(value);
+
     if (value === null || typeof value !== 'object') return value;
 
     // Cheapest path first: a value already watched is the common case.
@@ -537,6 +568,97 @@ export function pyEvent(value, lineOffset = 0) {
     };
 }
 
+// One Python function, made callable from JavaScript: coroutines awaited,
+// containers converted on the way out, and the call trimmed to the signature —
+// JavaScript calls with whatever it has, where Python raises on a positional
+// argument it never declared.
+export function pyCall(fn, where, lineOffset = 0, arity = Infinity) {
+    return (...args) => {
+        try {
+            const result = schedule(fn(...args.slice(0, arity)), where, lineOffset);
+
+            return result instanceof Promise ? result.then(plainData) : plainData(result);
+        } catch (error) {
+            throw pyError(error, where, lineOffset);
+        }
+    };
+}
+
+export function pyHandler(value) {
+    const found = declared(value);
+
+    return found === null ? value : pyCall(found.fn, found.where, 0, found.arity);
+}
+
+// A JavaScript function a Python module reached for, named in `importjs`. Python
+// calls it with Python values, and the one thing JavaScript genuinely cannot use
+// is a Python callable: it refuses arguments it never declared and answers in
+// Python objects.
+//
+// So every callable argument crosses the boundary the way an exported function
+// does, and everything else becomes plain data.
+const outbound = (value) => (typeof value === 'function' ? pyHandler(value) : plainData(value));
+
+// And what comes back. `jsobj2pyobj` is Brython's own machinery and it is
+// conservative in exactly the way this needs: a number becomes an int or a
+// float, a string a Python string, a DOM node a DOMNode — and everything else,
+// plain objects and Promises included, is returned untouched. Without it, a
+// value returned by an `importjs` function arrives as a raw JavaScript one, so
+// `cubicOut(0.5)` cannot be rounded, formatted, or even multiplied.
+const inbound = (value) => globalThis.__BRYTHON__.jsobj2pyobj(value);
+
+// A proxy rather than a wrapper function, because the name has to stay the thing
+// it was: its own properties, its prototype, `instanceof`, and construction with
+// `new` all still reach the original. Only a call made through it is adapted —
+// which matters here more than it did under Svelte, since the commonest
+// `importjs` of all is a child **component**, and Vue must receive the very
+// object the module exported.
+export function jsCall(value) {
+    if (typeof value !== 'function') return value;
+
+    return new Proxy(value, {
+        apply: (target, self, args) => inbound(Reflect.apply(target, self, args.map(outbound)))
+    });
+}
+
+// A module's function, read from Python that lives somewhere else.
+//
+// `$B.imported` holds a plain JavaScript object, so Brython reads a foreign
+// module's namespace as foreign and converts the arguments on the way in — a
+// `dict` would arrive with only its subscript left. Undone rather than
+// prevented: `pyobj2jsobj` records what it converted, so the original is there
+// to hand back, and anything not in the record passes through untouched.
+const boundaries = new WeakMap();
+
+const restored = (value) => {
+    if (value === null || typeof value !== 'object') return value;
+
+    const original = globalThis.__BRYTHON__.$vuythonPyobj?.get(value);
+
+    return original === undefined ? value : original;
+};
+
+export function pyBoundary(fn) {
+    if (typeof fn !== 'function') return fn;
+
+    // Memoised, because Python compares a function by identity: reading
+    // `panier.ajouter` twice has to answer the same object.
+    let wrapped = boundaries.get(fn);
+
+    if (wrapped === undefined) {
+        wrapped = (...args) => fn(...args.map(restored));
+
+        // The wrapper stands in for the Python function, so it answers for it
+        // too: `$function_infos` is where the name, the file and the declared
+        // arity are read from, and losing them leaves every caller downstream
+        // handing a Python signature more arguments than it takes.
+        wrapped.$function_infos = fn.$function_infos;
+        boundaries.set(fn, wrapped);
+    }
+
+    return wrapped;
+}
+
 // Hand Brython our namespace instead of the one it would have made for itself.
 //
 // The codegen opens every module body with `locals_X = $B.namespace('X')`, so
@@ -594,6 +716,38 @@ export function inTemplate(run) {
     }
 }
 
+// What `(obj.attr := value)` and `(obj[key] := value)` compile to — the two
+// targets Python's own grammar refuses the walrus, and that Vue's `=` takes.
+//
+// The dot carries the same rule `inTemplate` installs for a read: an existing
+// key wins over an attribute, so the write lands where the read came from. The
+// rule is repeated here rather than borrowed, because a handler fires on the
+// click, long after the expression that built it has left `inTemplate` and put
+// the original attribute lookup back.
+//
+// Both return the value, as an assignment expression must.
+export function writeAttr(target, name, value) {
+    const $B = globalThis.__BRYTHON__;
+
+    if ($B.$getattr(target, name, MISSING) === MISSING) {
+        try {
+            $B.$getitem(target, name);
+            $B.$setitem(target, name, value);
+            return value;
+        } catch {
+            /* no such key: the real assignment decides */
+        }
+    }
+
+    $B.$setattr(target, name, value);
+    return value;
+}
+
+export function writeItem(target, key, value) {
+    globalThis.__BRYTHON__.$setitem(target, key, value);
+    return value;
+}
+
 // One expression the markup pass lifted out of the template, read back.
 //
 // The dot rule above is installed for the length of the call and taken down
@@ -639,6 +793,46 @@ export function registerModule(name, namespace) {
 // `delete_for_reassign` in the mutation tracking above; what it buys is that the
 // object `setup()` returns and the object Brython writes into are the same
 // object.
+// One clock for the whole page, behind `fromnow`.
+//
+// Under Svelte this needed `createSubscriber` from `svelte/reactivity`, whose
+// whole job is to tell a signal when somebody starts and stops watching it. Vue
+// asks for none of that: reading a ref inside a render is the subscription, and
+// the timer disarms itself after each tick — it is re-armed only if something
+// read the value again, so a page with nothing left to count stops counting.
+//
+// Never longer than a day: `setTimeout` overflows past 2^31 ms and fires at
+// once, forever.
+const AT_MOST = 86400000;
+const clock = shallowRef(0);
+
+let armed = null;
+let wanted = Infinity;
+
+export function ticking(after) {
+    // Registers the dependency: whoever is reading re-runs on the next tick.
+    clock.value;
+
+    if (!(after > 0)) return;
+
+    wanted = Math.min(wanted, after, AT_MOST);
+
+    const at = Date.now() + wanted;
+
+    // Keep the soonest of everything asked for since the last tick.
+    if (armed && armed.at <= at) return;
+    if (armed) clearTimeout(armed.timer);
+
+    armed = {
+        at,
+        timer: setTimeout(() => {
+            armed = null;
+            wanted = Infinity;
+            clock.value += 1;
+        }, wanted)
+    };
+}
+
 export function bind(namespace, key, get, set) {
     Object.defineProperty(namespace, key, {
         get,

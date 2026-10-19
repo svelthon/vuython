@@ -7,10 +7,10 @@ import { test, expect, describe } from 'vitest';
 import { createSSRApp } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 
-import Counter from '../src/Counter.vue';
-import Notes from '../src/Notes.vue';
-import Greeting from '../src/Greeting.vue';
-import Rows from '../src/Rows.vue';
+import Counter from '../demo/Counter.vue';
+import Notes from '../demo/Notes.vue';
+import Greeting from '../demo/Greeting.vue';
+import Rows from '../demo/Rows.vue';
 
 describe('a component rendered on the server', () => {
     test('runs its Python and renders what it assigned', async () => {

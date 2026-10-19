@@ -1,8 +1,8 @@
 import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-import Interop from '../src/Interop.vue';
-import App from '../src/App.vue';
+import Interop from '../demo/Interop.vue';
+import App from '../demo/App.vue';
 
 // The commonest importjs of all is a child component — 25 of the 65 imports
 // measured across the Svelthon projects. Under Svelte that is a lexical binding

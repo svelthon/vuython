@@ -2,11 +2,11 @@ import { test, expect, describe, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import Boutique from '../src/Boutique.vue';
+import Boutique from '../demo/Boutique.vue';
 // A module's functions are exported to JavaScript too, so a test can reset the
 // state a whole file shares — which is the point of a module-scope ref, and the
 // reason it has to be reset between tests at all.
-import { vider } from '../src/panier.py';
+import { vider } from '../demo/panier.py';
 
 beforeEach(() => vider());
 

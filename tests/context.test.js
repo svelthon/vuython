@@ -2,8 +2,8 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import Theme from '../src/Theme.vue';
-import Champ from '../src/Champ.vue';
+import Theme from '../demo/Theme.vue';
+import Champ from '../demo/Champ.vue';
 
 // Context is per component subtree, where a module is per application. Both are
 // called while an instance initialises, which is exactly when the Python module

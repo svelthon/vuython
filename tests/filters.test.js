@@ -2,7 +2,10 @@ import { test, expect, describe, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { toRaw, nextTick } from 'vue';
 
-import Filtres from '../src/Filtres.vue';
+import Filtres from '../demo/Filtres.vue';
+// A component of the test's own: `inspect` writes to the console, which the
+// demo's page does not show and a green run does not say.
+import Inspect from './Inspect.vue';
 
 // The set Django and Jinja authors already know, under the words they search
 // for — and the platform's behaviour behind each of them, which is the rule the
@@ -55,7 +58,7 @@ describe('the template helpers', () => {
 // handed over already read.
 test('inspect logs, and re-reads on every change', async () => {
     const said = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const page = mount(Filtres);
+    const page = mount(Inspect);
 
     expect(said).toHaveBeenCalledWith('inspect', "Bonjour à Tous — l'été 2026");
 

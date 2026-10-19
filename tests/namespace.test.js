@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { toRaw, nextTick } from 'vue';
 
-import Counter from '../src/Counter.vue';
+import Counter from '../demo/Counter.vue';
 
 // The measurement the port was built to make.
 //

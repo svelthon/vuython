@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-import Notes from '../src/Notes.vue';
+import Notes from '../demo/Notes.vue';
 
 describe('the list a mutation moves', () => {
     test('renders what Python assigned', () => {

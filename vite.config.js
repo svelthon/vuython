@@ -16,7 +16,16 @@ export default defineConfig({
         conditions: ['browser']
     },
     // 5173, 5174, 5180 and 5190 to 5192 are taken by the Svelthon repositories.
+    // The demo is at /demo/.
     server: { port: 5195, strictPort: true },
+    // The demo's page, built with paths relative to it, so the build is served
+    // as well from GitHub Pages, under the repository's name, as from a root.
+    base: './',
+    build: {
+        rolldownOptions: {
+            input: fileURLToPath(new URL('./demo/index.html', import.meta.url))
+        }
+    },
     optimizeDeps: {
         // Vite's dependency scanner runs ahead of the plugin pipeline and would
         // hand `<script lang="python">` to a JavaScript parser. Naming what is

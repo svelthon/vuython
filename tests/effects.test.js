@@ -2,7 +2,7 @@ import { test, expect, describe, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import Ticker from '../src/Ticker.vue';
+import Ticker from '../demo/Ticker.vue';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());

@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import Variants from '../src/Variants.vue';
+import Variants from '../demo/Variants.vue';
 
 describe('the three effects', () => {
     test('all run once the component exists', async () => {

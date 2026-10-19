@@ -2,8 +2,8 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { h, nextTick } from 'vue';
 
-import Mesure from '../src/Mesure.vue';
-import { moitie, ajouter } from '../src/mesures.py';
+import Mesure from '../demo/Mesure.vue';
+import { moitie, ajouter } from '../demo/mesures.py';
 
 // `__js__` is `importjs` for a file with no markup. A module never asks for a
 // default export, a stylesheet or a namespace — those are template concerns —

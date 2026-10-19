@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-import Liste from '../src/Liste.vue';
+import Liste from '../demo/Liste.vue';
 
 // Three things that needed no work at all, checked rather than assumed. Each is
 // a place where Svelthon had to build something and Vuython inherits Vue's.

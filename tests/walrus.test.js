@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { walrus } from '../src/lib/markup.js';
 
-import Walrus from '../src/Walrus.vue';
+import Walrus from '../demo/Walrus.vue';
 
 describe('what the walrus compiles to', () => {
     test('a name goes through the namespace, so the accessor fires', () => {

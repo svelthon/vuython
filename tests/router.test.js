@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils';
 import { h } from 'vue';
 import { createRouter, createMemoryHistory, RouterView } from 'vue-router';
 
-import Accueil from '../src/Accueil.vue';
-import Note from '../src/Note.vue';
+import Accueil from '../demo/Accueil.vue';
+import Note from '../demo/Note.vue';
 
 // Routing is not part of Vue, and there is nothing here to port: `vue-router` is
 // a separate official package, and what it wants is a list of paths and the

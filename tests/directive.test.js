@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { toRaw, nextTick } from 'vue';
 
-import Directive from '../src/Directive.vue';
+import Directive from '../demo/Directive.vue';
 
 // Vue reads a directive off the `directives` option, which belongs to the
 // *component* and not to an instance — where the Python function lives in a

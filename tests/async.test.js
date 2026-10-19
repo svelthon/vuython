@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import Async from '../src/Async.vue';
+import Async from '../demo/Async.vue';
 
 const settle = async () => {
     for (let i = 0; i < 5; i++) await nextTick();

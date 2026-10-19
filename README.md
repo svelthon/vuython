@@ -59,9 +59,9 @@ From a clone of this repository:
 
 ```
 npm install
-npm test          # 135 tests
-npm run dev       # http://localhost:5195
-npm run build
+npm test          # the suite, the demo's components included
+npm run dev       # the demo, at http://localhost:5195/demo/
+npm run build     # the demo, built into dist/
 ```
 
 ## How it works

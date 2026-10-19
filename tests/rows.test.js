@@ -1,7 +1,7 @@
 import { test, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-import Rows from '../src/Rows.vue';
+import Rows from '../demo/Rows.vue';
 
 // The dot in a template finds an attribute, and failing that a key — Jinja's
 // rule, and what anyone arriving from Django or Flask already expects. It holds

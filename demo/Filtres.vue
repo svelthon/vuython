@@ -4,9 +4,6 @@
     lignes = [1, 2, 3, 4, 5]
     fiche = {"nom": "riz", "prix": 2}
     html = "<p>caf&eacute; <b>noir</b></p>"
-
-    # A console.log that re-runs on its own, and that a production build drops.
-    inspect(titre)
 </script>
 
 <template>

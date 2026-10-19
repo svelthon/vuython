@@ -1,8 +1,8 @@
 import { test, expect, describe } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-import Greeting from '../src/Greeting.vue';
-import Field from '../src/Field.vue';
+import Greeting from '../demo/Greeting.vue';
+import Field from '../demo/Field.vue';
 
 describe('a prop, declared by an annotation', () => {
     test('falls back to the default the Python body assigned', () => {

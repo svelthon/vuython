@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { toRaw, nextTick } from 'vue';
 
-import Lifecycle from '../src/Lifecycle.vue';
+import Lifecycle from '../demo/Lifecycle.vue';
 
 // `@derived` on a def is `=>` with a body instead of one line, and the name
 // reads as the result on both sides: Python reads `bar` and gets the string.

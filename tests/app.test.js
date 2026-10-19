@@ -2,8 +2,8 @@ import { test, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 
-import App from '../src/App.vue';
-import Field from '../src/Field.vue';
+import App from '../demo/App.vue';
+import Field from '../demo/Field.vue';
 
 // Nothing registered from the outside: App names its own children with
 // `importjs`, which is both a Python binding and a `components` entry.

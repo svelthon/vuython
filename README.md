@@ -31,10 +31,10 @@ use it, how to run its demo and how it works.
 
 ## Use it
 
-Install it from [npm](https://www.npmjs.com/package/vuython), with Vue and Vite:
+In a Vue project built with Vite, install it from [npm](https://www.npmjs.com/package/vuython):
 
 ```
-npm install vuython vue vite @vitejs/plugin-vue
+npm install vuython
 ```
 
 Then put its plugin before Vue's in `vite.config.js`:

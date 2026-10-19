@@ -14,7 +14,7 @@
     "main": "./src/lib/vuython.js",
     "exports": {
         ".": "./src/lib/vuython.js",
-        "./runtime": "./src/lib/runtime.js",
+        "./bridge": "./src/lib/bridge.js",
         "./package.json": "./package.json"
     },
     "files": [

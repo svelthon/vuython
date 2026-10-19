@@ -11,7 +11,7 @@ export default defineConfig({
     plugins: [vuython(), vue()],
     resolve: {
         alias: {
-            'vuython/runtime': fileURLToPath(new URL('./src/lib/runtime.js', import.meta.url))
+            'vuython/bridge': fileURLToPath(new URL('./src/lib/bridge.js', import.meta.url))
         },
         conditions: ['browser']
     },

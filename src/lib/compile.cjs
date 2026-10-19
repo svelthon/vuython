@@ -708,7 +708,7 @@ function compile(
     refuseLocked([...declared, ...reserved], !asModule, source);
 
     const module = [
-        `import { withNamespace, pyError } from 'vuython/runtime';`,
+        `import { withNamespace, pyError } from 'vuython/bridge';`,
         ``,
         `export function init(${NS}) {`,
         `  try {`,
@@ -808,7 +808,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
         `import { bind, hide, track, follow, pyError, pyEvent, pyBoundary, plainData, pyData,` +
-            ` jsCall, registerModule, NONE } from 'vuython/runtime';`,
+            ` jsCall, registerModule, NONE } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
         ``,
         ...state.flatMap((n) => [
@@ -946,7 +946,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
         `import { bind, hide, track, follow, template, pyError, pyEvent, plainData, pyData,` +
-            ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE } from 'vuython/runtime';`,
+            ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
         ``,
         `export default {`,

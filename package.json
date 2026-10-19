@@ -1,6 +1,6 @@
 {
     "name": "vuython",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "Vue single-file components written in Python, compiled by Brython at build time",
     "private": true,
     "type": "module",

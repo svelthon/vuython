@@ -1,7 +1,7 @@
 <script lang="python">
     count = 0
 
-    doubled => count * 7
+    doubled => count * 2
 
     def increment():
         global count

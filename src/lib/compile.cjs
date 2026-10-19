@@ -772,7 +772,6 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
     const memo = (n) => `__memo_${n}`;
     const scope = (n) => `__scope_${n}`;
     const bump = (n) => `__bump_${n}`;
-    const read = (n) => `__read_${n}`;
     const jsBound = (n) => `__js_${n}`;
 
     const jsLocals = [
@@ -814,8 +813,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         ``,
         ...state.flatMap((n) => [
             `const ${ref(n)} = shallowRef(undefined);`,
-            `const ${bump(n)} = () => triggerRef(${ref(n)});`,
-            `const ${read(n)} = () => { ${ref(n)}.value; };`
+            `const ${bump(n)} = () => triggerRef(${ref(n)});`
         ]),
         ...funcs.map((f) => `const ${fn(f.name)} = shallowRef(undefined);`),
         ...deriveds.flatMap((d) => [
@@ -835,7 +833,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         ...state.map(
             (n) =>
                 `bind(${NS}, '${n}', () => ${ref(n)}.value,` +
-                ` (v) => { ${ref(n)}.value = track(v, ${bump(n)}, ${read(n)}); });`
+                ` (v) => { ${ref(n)}.value = track(v, ${bump(n)}); });`
         ),
         // A module's function is read from *another* module, where the namespace
         // is an ordinary JavaScript object and Brython converts what it is
@@ -1023,7 +1021,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         // parent bound nothing still sees its own assignment.
         ...bindables.flatMap((b) => [
             `    bind(${NS}, '${b}', () => (${read(b)}(), follow((__props.${b} !== undefined ? __props.${b} : ${local(b)}.value) ?? NONE)),` +
-                ` (v) => { ${local(b)}.value = track(v, ${bump(b)}, ${read(b)});` +
+                ` (v) => { ${local(b)}.value = track(v, ${bump(b)});` +
                 ` if (!__initialising) __ctx.emit('update:${b}', __pybridge.bound(v)); });`,
             // The same name again, under a spelling the template can write to.
             // Vue refuses a v-model aimed at a declared prop; this one is
@@ -1038,7 +1036,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         ...state.map(
             (n) =>
                 `    bind(${NS}, '${n}', () => ${ref(n)}.value,` +
-                ` (v) => { ${ref(n)}.value = track(v, ${bump(n)}, ${read(n)}); });`
+                ` (v) => { ${ref(n)}.value = track(v, ${bump(n)}); });`
         ),
         ...written.map(
             (f) => `    bind(${NS}, '${f.name}', () => ${fn(f.name)}.value, (v) => { ${fn(f.name)}.value = v; });`

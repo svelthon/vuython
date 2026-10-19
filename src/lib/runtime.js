@@ -1,7 +1,36 @@
 // What every compiled component imports, on Bryntime's engine, which its one
 // entry loads and starts.
-import 'bryntime';
-import { shallowRef } from 'vue';
+import { host, track as tracked, follow as followed } from 'bryntime';
+import { customRef, shallowRef } from 'vue';
+
+// What only Vue knows, told to Bryntime (`host`): its name, which signs a
+// refusal, and how a reaction subscribes to a Python value Bryntime watches.
+// A `customRef` is Vue's own signal: reading it inside an effect subscribes
+// the effect, writing it runs the effect again. Vue says nothing when the last
+// reader leaves, so a value once followed stays joined to its signal.
+host.name = 'vuython';
+host.subscriber = (start) => {
+    let joined = false;
+    const signal = customRef((track, trigger) => ({
+        get() {
+            track();
+            return undefined;
+        },
+        set() {
+            trigger();
+        }
+    }));
+
+    return () => {
+        void signal.value;
+        if (!joined) {
+            joined = true;
+            start(() => {
+                signal.value = undefined;
+            });
+        }
+    };
+};
 
 // Python's None, so a prop the parent never passed reads as None rather than
 // leaking JavaScript's undefined into Python.
@@ -54,16 +83,10 @@ export const __pybridge = {
     // but a dict, a set, a range, a generator or the result of .items() is not —
     // and iterating those is the whole point of writing the loop in Python.
     seq(value) {
-        if (Array.isArray(value)) {
-            // Hand the watch down to the rows: v-for walks the array in
-            // JavaScript, never through $getitem, so this is the only path by
-            // which an item can come under watch before its block reads it.
-            if (value.$notify !== undefined) {
-                for (const item of value) inherit(value, item);
-            }
-
-            return value;
-        }
+        // A row of a watched list is watched already: Bryntime walks what a
+        // container holds when it comes under watch, and hands the watch to
+        // what enters it afterwards.
+        if (Array.isArray(value)) return value;
         if (value === undefined || value === null) return [];
 
         try {
@@ -101,111 +124,11 @@ export const __pybridge = {
     }
 };
 
-// Methods that change a container. `__setitem__` and `__delitem__` are not
-// here: Brython compiles `d[k] = v` and `del d[k]` to their own calls, caught
-// below.
-const MUTATORS = new Set([
-    'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'sort', 'reverse',
-    'add', 'discard', 'update', 'setdefault', 'popitem', 'appendleft',
-    'extendleft', 'popleft', 'rotate', 'intersection_update',
-    'difference_update', 'symmetric_difference_update'
-]);
-
-// Methods that hand out a container the caller can then mutate, without any
-// indexing to catch it.
-const VIEWS = new Set(['items', 'values']);
-
-// Make an in-place mutation reactive — `notes.append(15)` with nothing after it.
-//
-// This half is Brython's, and it is the half that ports unchanged: every method
-// call in the language goes through `$B.call_attr`, every indexed write through
-// `$B.$setitem`. Two interceptions cover the whole language, whatever framework
-// is on the other side. Vue changes only what the marker *does* when it fires.
-//
-// A Python list *is* a JavaScript array, so the object itself carries a
-// non-enumerable marker rather than being proxied — `$B.get_class` reads only
-// `ob_type`, so `type(items) is list` stays true and `repr` is untouched.
-function installMutationTracking($B) {
-    if ($B.$vuythonTracking) return;
-    $B.$vuythonTracking = true;
-
-    const notify = (obj) => {
-        if (obj !== null && typeof obj === 'object' && obj.$notify !== undefined) obj.$notify();
-    };
-
-    // Rest arguments rather than `arguments` + apply: these sit on the hottest
-    // path Brython has, and the old form blocks V8's optimiser.
-    const callAttr = $B.call_attr;
-    $B.call_attr = function (obj, attr, ...rest) {
-        const result = callAttr(obj, attr, ...rest);
-
-        // The marker is checked first on purpose: this runs on every method call
-        // in the program, and an unwatched object must pay one property miss.
-        if (obj !== null && typeof obj === 'object' && obj.$notify !== undefined) {
-            if (MUTATORS.has(attr)) {
-                if (attr === 'setdefault') inherit(obj, result);
-                obj.$notify();
-            } else if (VIEWS.has(attr)) {
-                // `.items()` and `.values()` hand out the children without ever
-                // indexing them. A Brython dict exposes its keys as enumerable
-                // JavaScript properties, so the values are reachable directly.
-                for (const key in obj) inherit(obj, obj[key]);
-            } else if (attr === 'get') {
-                inherit(obj, result);
-            }
-        }
-
-        return result;
-    };
-
-    const setitem = $B.$setitem;
-    $B.$setitem = function (obj, key, value, ...rest) {
-        const result = setitem(obj, key, value, ...rest);
-        if (obj !== null && typeof obj === 'object' && obj.$notify !== undefined) {
-            inherit(obj, value); // `d["rows"] = rows` puts rows under watch too
-            obj.$notify();
-        }
-        return result;
-    };
-
-    // Reading is where nesting is caught, and it is the hottest of the three.
-    const getitem = $B.$getitem;
-    $B.$getitem = function (obj, ...rest) {
-        const result = getitem(obj, ...rest);
-        if (obj !== null && typeof obj === 'object' && obj.$notify !== undefined) {
-            inherit(obj, result);
-        }
-        return result;
-    };
-
-    const delitem = $B.$delitem;
-    $B.$delitem = function (obj, ...rest) {
-        const result = delitem(obj, ...rest);
-        notify(obj);
-        return result;
-    };
-
-    // `box.value = 1` and `del box.value`. Brython compiles an attribute write
-    // through one of two entry points depending on the statement, and both have
-    // to be covered or the rule would hold only half the time.
-    for (const name of ['$setattr', '$setattr1']) {
-        const setattr = $B[name];
-        $B[name] = function (obj, attr, value, ...rest) {
-            const result = setattr(obj, attr, value, ...rest);
-            if (obj !== null && typeof obj === 'object' && obj.$notify !== undefined) {
-                inherit(obj, value);
-                obj.$notify();
-            }
-            return result;
-        };
-    }
-
-    const delattr = $B.$delattr;
-    $B.$delattr = function (obj, ...rest) {
-        const result = delattr(obj, ...rest);
-        notify(obj);
-        return result;
-    };
+// An in-place mutation, `notes.append(15)` with nothing after it, is
+// Bryntime's to see (`track`, `follow`). What is Vuython's is below.
+function keepAccessors($B) {
+    if ($B.$vuythonAccessors) return;
+    $B.$vuythonAccessors = true;
 
     // Rebinding a global emits `$B.delete_for_reassign(name, locals)` ahead of
     // the assignment, and its plain `delete namespace[name]` would drop the
@@ -226,23 +149,7 @@ function installMutationTracking($B) {
     };
 }
 
-installMutationTracking(globalThis.__BRYTHON__);
-
-// Only a container can be mutated in place; a scalar propagates by rebinding,
-// which the accessor already handles.
-function mutable(value) {
-    if (value === null || value === undefined || typeof value !== 'object') return false;
-    if (Array.isArray(value)) return true; // list — a tuple is one too, and immutable
-    if (value === NONE) return false; // a singleton shared by the whole program
-
-    try {
-        const cls = globalThis.__BRYTHON__.get_class(value);
-        // A class object is not data — and a function is not an object here.
-        return cls !== undefined && cls !== _b_.type;
-    } catch {
-        return false; // a foreign JavaScript value is not ours to mark
-    }
-}
+keepAccessors(globalThis.__BRYTHON__);
 
 // Brython keeps an instance's attributes under a private symbol, not as JS
 // properties — so they have to be found once, from the first object carrying it.
@@ -259,44 +166,6 @@ function ownAttributes(value) {
     return value[DICT];
 }
 
-function mark(value, bumps, reads) {
-    const marker = () => {
-        for (const one of bumps) one();
-    };
-    marker.bumps = bumps;
-    marker.reads = reads;
-    marker.follow = () => {
-        for (const one of reads) one();
-    };
-
-    try {
-        Object.defineProperty(value, '$notify', {
-            value: marker,
-            enumerable: false,
-            configurable: true
-        });
-    } catch {
-        /* a frozen object is not ours: leave it alone */
-        return value;
-    }
-
-    // A container already sitting in an attribute — `self.rows = []` written in
-    // __init__ — was put there before the object came under watch. Hand it the
-    // watch now; inherit() marks in turn, so depth follows on its own.
-    const attributes = ownAttributes(value);
-    if (attributes !== undefined) {
-        for (const key in attributes) inherit(value, attributes[key]);
-    }
-
-    return value;
-}
-
-// Attach a marker to the value stored under a module-level name.
-//
-// `bump` says it moved; `read` subscribes whoever is asking. Under Vue the two
-// are the same ref — `triggerRef(r)` fires the dep that `r.value` registers —
-// where Svelte needed a second signal beside the value, because `$state.raw`
-// drops a write whose value is unchanged by `===`.
 // A value written into a Python name from the JavaScript side.
 //
 // `v-model` on a group of checkboxes hands the name a **JavaScript array**, and
@@ -317,45 +186,16 @@ function adopt(value) {
         : value;
 }
 
-export function track(value, bump, read) {
+// The value stored under a module-level name, watched: `bump` is told of every
+// change Python makes to it or to anything under it, and the name's ref, which
+// `bump` triggers, wakes whatever read the name. Under Vue that is one ref,
+// where Svelte needed a second signal beside the value, because `$state.raw`
+// drops a write whose value is unchanged by `===`.
+export function track(value, bump) {
     value = adopt(value);
+    tracked(value, bump);
 
-    if (value === null || typeof value !== 'object') return value;
-
-    // Cheapest path first: a value already watched is the common case.
-    const own = value.$notify;
-    if (own !== undefined) {
-        if (!own.bumps.includes(bump)) {
-            own.bumps.push(bump);
-            own.reads.push(read);
-        }
-        return value;
-    }
-
-    return mutable(value) ? mark(value, [bump], [read]) : value;
-}
-
-// A container read out of a watched one comes under the same watch. This is
-// what deep proxying buys Vue, done lazily and without a single proxy: the child
-// is marked the first time Python reaches for it, which is necessarily just
-// before it could be mutated.
-function inherit(parent, child) {
-    if (child === null || typeof child !== 'object') return child;
-
-    const marker = parent.$notify;
-    const own = child.$notify;
-
-    if (own !== undefined) {
-        for (let i = 0; i < marker.bumps.length; i++) {
-            if (!own.bumps.includes(marker.bumps[i])) {
-                own.bumps.push(marker.bumps[i]);
-                own.reads.push(marker.reads[i]);
-            }
-        }
-        return child;
-    }
-
-    return mutable(child) ? mark(child, marker.bumps.slice(), marker.reads.slice()) : child;
+    return value;
 }
 
 // Subscribe the caller to the value it is being handed.
@@ -367,10 +207,7 @@ function inherit(parent, child) {
 // re-establishes the link at the far end, where the reader is, rather than
 // trying to defeat the memoisation.
 export function follow(value) {
-    if (value !== null && typeof value === 'object') {
-        const marker = value.$notify;
-        if (marker !== undefined) marker.follow();
-    }
+    followed(value);
 
     return value;
 }

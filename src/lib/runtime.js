@@ -1,6 +1,17 @@
 // What every compiled component imports, on Bryntime's engine, which its one
 // entry loads and starts.
 import { host, track as tracked, follow as followed } from 'bryntime';
+
+// A JavaScript value copied in for Python; a module's namespace published under
+// its Python name, so another component's Python can `import` it and reach the
+// very same refs; and a JavaScript function a Python module reached for with
+// `importjs`, called with Python's values and answering in Python's; and a
+// module's body run in the namespace Vuython hands Brython instead of the one it
+// would have made for itself; and a Python function made callable from
+// JavaScript, the call trimmed to its signature, a coroutine awaited and what
+// it returns crossing back; and what a Python function hands to something
+// outside Python, copied as plain data: Bryntime's, as they are.
+export { pyData, plainData, registerModule, jsCall, withNamespace, pyHandler } from 'bryntime';
 import { customRef, shallowRef } from 'vue';
 
 // What only Vue knows, told to Bryntime (`host`): its name, which signs a
@@ -150,21 +161,6 @@ function keepAccessors($B) {
 }
 
 keepAccessors(globalThis.__BRYTHON__);
-
-// Brython keeps an instance's attributes under a private symbol, not as JS
-// properties — so they have to be found once, from the first object carrying it.
-let DICT;
-
-function ownAttributes(value) {
-    if (Array.isArray(value)) return undefined;
-
-    if (DICT === undefined) {
-        DICT = Object.getOwnPropertySymbols(value).find((symbol) => symbol.description === 'DICT');
-        if (DICT === undefined) return undefined;
-    }
-
-    return value[DICT];
-}
 
 // A value written into a Python name from the JavaScript side.
 //
@@ -322,79 +318,6 @@ export function schedule(result, where, lineOffset = 0) {
     return promise;
 }
 
-// What a Python function hands back to something outside Python.
-//
-// A Brython dict carries symbol-keyed internals (`Symbol(OB_TYPE)`) that no
-// serialiser outside Python will read, so the boundary converts.
-export function plainData(value, seen) {
-    const $B = globalThis.__BRYTHON__;
-
-    if (value === undefined || value === null || value === NONE) return null;
-    if (typeof value !== 'object') return value;
-
-    // A Brython float is an object holding a number and a reference to its type.
-    if (value.ob_type === _b_.float) return value.value;
-
-    if ($B.get_class(value) === $B.coroutine) {
-        return schedule(value, 'coroutine').then(plainData);
-    }
-
-    // A graph that loops back on itself would otherwise recurse until the stack
-    // gives out. What is tracked is the *branch being walked*: the same object
-    // twice in one list is shared, not circular, and has to come out twice.
-    seen ??= new Set();
-    if (seen.has(value)) return null;
-    seen.add(value);
-
-    try {
-        return branch(value, seen);
-    } finally {
-        seen.delete(value);
-    }
-}
-
-function branch(value, seen) {
-    if (Array.isArray(value)) return value.map((one) => plainData(one, seen)); // list, tuple
-
-    // Anything with a constructor of its own is not ours to flatten: a Response,
-    // a URL, a Date, a Map, a Promise.
-    if (value.constructor !== undefined && value.constructor !== Object) return value;
-
-    // A class instance keeps its attributes under a private symbol rather than
-    // as JavaScript properties, so walking its own keys finds almost nothing and
-    // wanders into the class object instead.
-    const attributes = ownAttributes(value);
-
-    if (attributes !== undefined && attributes !== null && typeof attributes === 'object') {
-        const fields = {};
-        for (const key of Object.keys(attributes)) fields[key] = plainData(attributes[key], seen);
-        return fields;
-    }
-
-    const out = {};
-    for (const key of Object.keys(value)) out[key] = plainData(value[key], seen);
-    return out;
-}
-
-// The inbound twin: a JavaScript value as real Python. The walk is Brython's own
-// `JSObj.to_dict()`; what is left here is the root, which a method on an object
-// cannot speak for — a scalar, a null, a bare array.
-export function pyData(value) {
-    const $B = globalThis.__BRYTHON__;
-
-    if (value === undefined || value === null) return NONE;
-    if (typeof value !== 'object') return value;
-    if (Array.isArray(value)) return _b_.list.$factory(value.map(pyData));
-
-    const python = $B.jsobj2pyobj(value);
-
-    // Idempotent, which it has to be: `jsobj2pyobj` hands back the *original*
-    // Python object when the value once came from one, and a dict has no
-    // `to_dict`.
-    const toDict = $B.$getattr(python, 'to_dict', null);
-
-    return toDict === null ? python : toDict();
-}
 
 // A Python function seen from JavaScript, wrapped by reading its own signature
 // rather than a declaration we made — the layout is Brython's `$function_infos`:
@@ -432,59 +355,6 @@ export function pyEvent(value, lineOffset = 0) {
             throw pyError(error, where, lineOffset);
         }
     };
-}
-
-// One Python function, made callable from JavaScript: coroutines awaited,
-// containers converted on the way out, and the call trimmed to the signature —
-// JavaScript calls with whatever it has, where Python raises on a positional
-// argument it never declared.
-export function pyCall(fn, where, lineOffset = 0, arity = Infinity) {
-    return (...args) => {
-        try {
-            const result = schedule(fn(...args.slice(0, arity)), where, lineOffset);
-
-            return result instanceof Promise ? result.then(plainData) : plainData(result);
-        } catch (error) {
-            throw pyError(error, where, lineOffset);
-        }
-    };
-}
-
-export function pyHandler(value) {
-    const found = declared(value);
-
-    return found === null ? value : pyCall(found.fn, found.where, 0, found.arity);
-}
-
-// A JavaScript function a Python module reached for, named in `importjs`. Python
-// calls it with Python values, and the one thing JavaScript genuinely cannot use
-// is a Python callable: it refuses arguments it never declared and answers in
-// Python objects.
-//
-// So every callable argument crosses the boundary the way an exported function
-// does, and everything else becomes plain data.
-const outbound = (value) => (typeof value === 'function' ? pyHandler(value) : plainData(value));
-
-// And what comes back. `jsobj2pyobj` is Brython's own machinery and it is
-// conservative in exactly the way this needs: a number becomes an int or a
-// float, a string a Python string, a DOM node a DOMNode — and everything else,
-// plain objects and Promises included, is returned untouched. Without it, a
-// value returned by an `importjs` function arrives as a raw JavaScript one, so
-// `cubicOut(0.5)` cannot be rounded, formatted, or even multiplied.
-const inbound = (value) => globalThis.__BRYTHON__.jsobj2pyobj(value);
-
-// A proxy rather than a wrapper function, because the name has to stay the thing
-// it was: its own properties, its prototype, `instanceof`, and construction with
-// `new` all still reach the original. Only a call made through it is adapted —
-// which matters here more than it did under Svelte, since the commonest
-// `importjs` of all is a child **component**, and Vue must receive the very
-// object the module exported.
-export function jsCall(value) {
-    if (typeof value !== 'function') return value;
-
-    return new Proxy(value, {
-        apply: (target, self, args) => inbound(Reflect.apply(target, self, args.map(outbound)))
-    });
 }
 
 // A module's function, read from Python that lives somewhere else.
@@ -525,24 +395,6 @@ export function pyBoundary(fn) {
     return wrapped;
 }
 
-// Hand Brython our namespace instead of the one it would have made for itself.
-//
-// The codegen opens every module body with `locals_X = $B.namespace('X')`, so
-// intercepting that single call is enough — no rewriting of generated code. The
-// name is checked because a module body may import others while it runs, and
-// each import creates its own namespace through the same function.
-export function withNamespace(name, namespace, run) {
-    const $B = globalThis.__BRYTHON__;
-    const original = $B.namespace;
-
-    $B.namespace = (requested) => (requested === name ? namespace : original(requested));
-
-    try {
-        return run();
-    } finally {
-        $B.namespace = original;
-    }
-}
 
 // `pep.title` inside the markup, on a dict.
 //
@@ -687,12 +539,6 @@ export function pyDirective(name, lineOffset = 0) {
     };
 
     return { mounted: run, updated: run, unmounted: stop };
-}
-
-// A module's namespace, published under its Python module name, so another
-// component's Python can `import` it and reach the very same refs.
-export function registerModule(name, namespace) {
-    globalThis.__BRYTHON__.imported[name] = namespace;
 }
 
 // The accessor pair for one module-level Python name.

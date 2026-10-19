@@ -1,6 +1,10 @@
 # Vuython
 
-**Vue single-file components written in Python, compiled at build time.**
+**Vue components in Python.**
+
+A demo of integrating Bryntime and Bryc into Vue, independent of Svelthon. It
+runs on [Bryntime](https://www.npmjs.com/package/bryntime), the Brython runtime
+for JavaScript frameworks, and on Bryc, the compiler built on it.
 
 ```vue
 <script lang="python">
@@ -15,6 +19,7 @@
 <template>
     <li v-for="note in notes">{{ note }}</li>
     <p>moyenne : {{ moyenne }}</p>
+    <button @click="ajouter(15)">ajouter 15</button>
 </template>
 ```
 
@@ -22,9 +27,35 @@
 average on screen follows.
 
 Built to answer one question about Vue, then filled in. What follows is how to
-run it and how it works.
+use it, how to run its demo and how it works.
+
+## Use it
+
+Install it from [npm](https://www.npmjs.com/package/vuython), with Vue and Vite:
+
+```
+npm install vuython vue vite @vitejs/plugin-vue
+```
+
+Then put its plugin before Vue's in `vite.config.js`:
+
+```js
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import { vuython } from 'vuython';
+
+export default defineConfig({
+    plugins: [vuython(), vue()]
+});
+```
+
+A component whose script is `<script lang="python">` is then a Vue component
+like any other, mounted with `createApp(Component).mount('#app')`. A `.py` it
+imports is looked up beside it, then along `vuython({ path: [...] })`.
 
 ## Run it
+
+From a clone of this repository:
 
 ```
 npm install
@@ -55,11 +86,10 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
    accessor over a `shallowRef`; Vue reads the template out of the same object
    Brython writes into. There is no second copy to keep in step.
 
-5. **A mutation is caught by Brython, not by a proxy.** Every method call in the
-   language goes through `$B.call_attr` and every indexed write through
-   `$B.$setitem`, so `notes.append(15)` is caught where it happens and answered
-   with `triggerRef` on the name's own ref. The value keeps its identity, and
-   `type(notes) is list` stays true.
+5. **A mutation is caught by Bryntime, not by a proxy.** Bryntime watches the
+   value a name holds and everything under it, so `notes.append(15)` is caught
+   where it happens and answered with `triggerRef` on the name's own ref. The
+   value keeps its identity, and `type(notes) is list` stays true.
 
 ## What Python buys, and what it costs
 
@@ -120,7 +150,9 @@ is no `host()`, Svelte's custom-element hook.
 
 ## Where it comes from
 
-[Svelthon](../SVELTHON) is the same idea on Svelte, and further along. Vuython
-reuses its Brython half unchanged — the mutation tracking, the namespace
-interception, the boundary conversions, the error reporting — and rebuilds the
-framework half.
+Svelthon is the same idea on Svelte, and further along. Vuython was first built
+from its parts; it now depends on nothing of Svelthon's. What the two share,
+the crossings between Python and JavaScript, the mutation tracking and the
+module system, is Bryntime, which both depend on, and the compiler is Bryc.
+What is Vue's, the host Bryntime talks to and the template, is Vuython's own
+(`vuython/bridge`).

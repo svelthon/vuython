@@ -708,14 +708,17 @@ function compile(
     refuseLocked([...declared, ...reserved], !asModule, source);
 
     const module = [
-        `import { withNamespace, pyError } from 'vuython/bridge';`,
+        `import { withNamespace, pyError, placed } from 'vuython/bridge';`,
+        ``,
+        // Where this file's Python starts, for every error a frame of it names.
+        `placed(${JSON.stringify(source)}, ${lineOffset});`,
         ``,
         `export function init(${NS}) {`,
         `  try {`,
         `    return withNamespace('${namespace}', ${NS}, () => {`,
         js,
         `    });`,
-        `  } catch (err) { throw pyError(err, ${JSON.stringify(source)}, ${lineOffset}); }`,
+        `  } catch (err) { throw pyError(err, ${JSON.stringify(source)}); }`,
         `}`
     ].join('\n');
 
@@ -807,7 +810,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
     return [
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
-        `import { bind, hide, track, follow, pyError, pyEvent, plainData, pyData,` +
+        `import { bind, hide, track, follow, pyError, pyHandler, plainData, pyData,` +
             ` jsCall, registerModule, NONE } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
         ``,
@@ -860,7 +863,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         ...effects.flatMap((e) => [
             `${scope(e.name)} = effectScope();`,
             `${scope(e.name)}.run(() => watchEffect((__cleanup) => { const __d = ${fn(e.name)}.value();` +
-                ` if (typeof __d === 'function') __cleanup(pyEvent(__d, ${lineOffset})); }, { flush: 'post' }));`
+                ` if (typeof __d === 'function') __cleanup(pyHandler(__d)); }, { flush: 'post' }));`
         ]),
         ``,
         // The namespace itself, so JavaScript reads the same accessors Python
@@ -868,7 +871,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         `export const state = ${NS};`,
         ...exported.map(
             (n) =>
-                `export const ${n} = (...a) => { const f = pyEvent(${fn(n)}.value, ${lineOffset});` +
+                `export const ${n} = (...a) => { const f = pyHandler(${fn(n)}.value);` +
                 ` return plainData(f(...a)); };`
         ),
         `export default ${NS};`
@@ -944,7 +947,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
     return [
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
-        `import { bind, hide, track, follow, template, pyError, pyEvent, plainData, pyData,` +
+        `import { bind, hide, track, follow, template, pyError, pyHandler, plainData, pyData,` +
             ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
         ``,
@@ -958,7 +961,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         ...(directives.length
             ? [
                   `  directives: { ${directives
-                      .map((d) => `${d.name}: pyDirective('${d.name}', ${lineOffset})`)
+                      .map((d) => `${d.name}: pyDirective('${d.name}')`)
                       .join(', ')} },`
               ]
             : []),
@@ -1042,7 +1045,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         ),
         ...lifted.map(
             (f) =>
-                `    bind(${NS}, '${f.name}', () => template(${fn(f.name)}.value, ${where(f.name)}, ${lineOffset}),` +
+                `    bind(${NS}, '${f.name}', () => template(${fn(f.name)}.value, ${where(f.name)}),` +
                 ` (v) => { ${fn(f.name)}.value = v; });`
         ),
         ...inspects.map(
@@ -1066,8 +1069,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         // What a compiled template expression calls. They live in the namespace
         // like everything else, so Python reaches them by name and Vue reaches
         // them as `_ctx.__text` — one binding, both sides.
-        `    const __event = (f) => pyEvent(f, ${lineOffset});`,
-        `    bind(${NS}, '__event', () => __event, () => {});`,
+        `    bind(${NS}, '__event', () => pyHandler, () => {});`,
         // What `(name := value)` in a handler compiles to. The write goes
         // through the namespace, so through the accessor, so the ref fires —
         // which is the whole reason the walrus can mean this here.
@@ -1103,7 +1105,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         ...effects.flatMap((e) => {
             const run =
                 `(__cleanup) => { const __d = ${fn(e.name)}.value();` +
-                ` if (typeof __d === 'function') __cleanup(pyEvent(__d, ${lineOffset})); }`;
+                ` if (typeof __d === 'function') __cleanup(pyHandler(__d)); }`;
             // Vue's default flush is 'pre', which is what `@effect.pre` means;
             // 'post' runs after the DOM has been patched, which is what a plain
             // effect means on both sides.
@@ -1124,14 +1126,14 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
             (i) =>
                 `    if (import.meta.env.DEV) watchEffect(() => { const __v = ${fn(i.name)}.value();` +
                 (i.logger
-                    ? ` const [__log, ...__rest] = __v; pyEvent(__log, ${lineOffset})(...__rest.map(plainData)); });`
+                    ? ` const [__log, ...__rest] = __v; pyHandler(__log)(...__rest.map(plainData)); });`
                     : ` console.log('inspect', ...__v.map(plainData)); });`)
         ),
         ...(lifecycle('on_mount')
-            ? [`    onMounted(() => pyEvent(${fn('on_mount')}.value, ${lineOffset})());`]
+            ? [`    onMounted(() => pyHandler(${fn('on_mount')}.value)());`]
             : []),
         ...(lifecycle('on_destroy')
-            ? [`    onUnmounted(() => pyEvent(${fn('on_destroy')}.value, ${lineOffset})());`]
+            ? [`    onUnmounted(() => pyHandler(${fn('on_destroy')}.value)());`]
             : []),
         // After init(), because that is when the `def` has run and there is
         // something to expose. The boundary is the handler's, not the module
@@ -1140,7 +1142,7 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         ...(exposed.length
             ? [
                   `    __ctx.expose({ ${exposed
-                      .map((f) => `${f.name}: pyEvent(${fn(f.name)}.value, ${lineOffset})`)
+                      .map((f) => `${f.name}: pyHandler(${fn(f.name)}.value)`)
                       .join(', ')} });`
               ]
             : []),

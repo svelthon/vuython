@@ -26,13 +26,6 @@ export default defineConfig({
             input: fileURLToPath(new URL('./demo/index.html', import.meta.url))
         }
     },
-    optimizeDeps: {
-        // Vite's dependency scanner runs ahead of the plugin pipeline and would
-        // hand `<script lang="python">` to a JavaScript parser. Naming what is
-        // worth pre-bundling lets the scan be skipped entirely.
-        entries: [],
-        include: ['vue']
-    },
     test: {
         environment: 'jsdom',
         // The first import of a component compiles its Python, which goes past

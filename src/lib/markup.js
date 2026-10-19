@@ -367,14 +367,18 @@ function rewriteAttribute(name, value, call, opened) {
 
     if (isHandler(name)) {
         // A reference: Vue keeps the value and calls it with the event, so what
-        // it must be handed is a JavaScript function. Anything else is an inline
-        // statement, and Vue wraps it in `$event => { … }` itself — which is
-        // where the event comes from, and why `event` is a parameter.
+        // it must be handed is a JavaScript function, and handed as a function
+        // expression: a call, `__event(…)`, is an inline statement to Vue, run on
+        // each event and its result dropped. The arrow passes every argument on,
+        // as Vue does to a reference, and reads the name at the event, so a
+        // rebound name is the one called. Anything else is an inline statement,
+        // and Vue wraps it in `$event => { … }` itself — which is where the event
+        // comes from, and why `event` is a parameter.
         //
         // The walrus is read here and only here: a handler is the one place a
         // template does something rather than reads.
         return REFERENCE.test(value.trim())
-            ? `__event(${call(value, null)})`
+            ? `(...__args) => __event(${call(value, null)})(...__args)`
             : call(walrus(value), null, ['event'], ['$event']);
     }
 

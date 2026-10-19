@@ -87,6 +87,13 @@ export function vuython(options = {}) {
         name: 'vuython',
         enforce: 'pre',
 
+        // Vite's dependency scanner runs ahead of the plugin pipeline and would
+        // hand `<script lang="python">` to a JavaScript parser, which fails on
+        // the first `def`. So the scan is skipped and what is worth pre-bundling
+        // is named, as vite-plugin-svelte names Svelte's. Merged with the
+        // project's own: entries a project names are scanned.
+        config: () => ({ optimizeDeps: { entries: [], include: ['vue'] } }),
+
         resolveId(id, importer) {
             if (id.startsWith(VIRTUAL_PREFIX)) return '\0' + id;
 

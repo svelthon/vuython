@@ -98,7 +98,7 @@ describe('a handler, told apart the way Vue tells them apart', () => {
     test('a name is handed over as a function', () => {
         const { out, defs } = rewrite('<button @click="add">x</button>');
 
-        expect(out).toBe('<button @click="__event(__expr_0())">x</button>');
+        expect(out).toBe('<button @click="(...__args) => __event(__expr_0())(...__args)">x</button>');
         expect(defs[0]).toBe('def __expr_0():\n    return add');
     });
 

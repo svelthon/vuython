@@ -1,6 +1,6 @@
 // What every compiled component imports, on Bryntime's engine, which its one
 // entry loads and starts.
-import { host, track as tracked, follow as followed } from 'bryntime';
+import { host, lent, track as tracked, follow as followed, pyHandler, pyError, scheduleAsync } from 'bryntime';
 
 // A JavaScript value copied in for Python; a module's namespace published under
 // its Python name, so another component's Python can `import` it and reach the
@@ -9,9 +9,11 @@ import { host, track as tracked, follow as followed } from 'bryntime';
 // module's body run in the namespace Vuython hands Brython instead of the one it
 // would have made for itself; and a Python function made callable from
 // JavaScript, the call trimmed to its signature, a coroutine awaited and what
-// it returns crossing back; and what a Python function hands to something
-// outside Python, copied as plain data: Bryntime's, as they are.
-export { pyData, plainData, registerModule, jsCall, withNamespace, pyHandler } from 'bryntime';
+// it returns crossing back, at every door: a handler, a hook, an export; and
+// what a Python function hands to something outside Python, copied as plain
+// data; and a Python exception with its message and its place filled in:
+// Bryntime's, as they are.
+export { pyData, plainData, registerModule, jsCall, withNamespace, pyHandler, pyError } from 'bryntime';
 import { customRef, shallowRef } from 'vue';
 
 // What only Vue knows, told to Bryntime (`host`): its name, which signs a
@@ -208,156 +210,17 @@ export function follow(value) {
     return value;
 }
 
-// A Brython exception reaching JavaScript carries neither `message` nor `stack`,
-// so devtools and Vite's overlay show nothing at all — the text sits in the
-// Python object, where nothing JS looks. Fill both in, keeping the original
-// object so Python semantics upstream are untouched.
-export function pyError(error, where, lineOffset = 0) {
-    const $B = globalThis.__BRYTHON__;
+// Line numbers in a traceback count from the start of the Python source, which
+// for a component begins after its opening <script> tag. Each file says how far
+// down that is when its module loads (`placed`), and Bryntime asks when it names
+// a frame of that file in an error.
+const OFFSETS = new Map();
 
-    if (!error || typeof error !== 'object' || error.message !== undefined) return error;
+lent.place = (file, line) => line + (OFFSETS.get(file) ?? 0);
 
-    // Not ours to describe: a JavaScript value thrown through a Python frame
-    // must come out the other side untouched.
-    try {
-        if ($B.get_class(error) === undefined) return error;
-    } catch {
-        return error;
-    }
-
-    let described;
-    try {
-        // Not `cls.__name__`: a Brython class keeps it out of its JS properties,
-        // so the lookup has to go through Python's own attribute protocol.
-        const name = $B.$getattr($B.get_class(error), '__name__');
-        described = `${name}: ${_b_.str.$factory(error)}`;
-    } catch {
-        described = 'PythonError';
-    }
-
-    // The deepest frame is where it actually broke. Line numbers count from the
-    // start of the Python source, which for a component begins after its opening
-    // <script> tag — hence the offset back to the file's own numbering.
-    let line;
-    try {
-        let tb = $B.$getattr(error, '__traceback__');
-        while (tb && tb !== NONE) {
-            line = $B.$getattr(tb, 'tb_lineno');
-            tb = $B.$getattr(tb, 'tb_next');
-        }
-    } catch {
-        /* no usable traceback */
-    }
-
-    const at = line === undefined ? where : `${where}:${line + lineOffset}`;
-
-    try {
-        error.message = `${described} (${at})`;
-        if (error.stack === undefined) error.stack = `${error.message}\n    at ${at}`;
-    } catch {
-        /* a frozen exception: pass it on as it stands */
-    }
-
-    return error;
+export function placed(file, offset) {
+    OFFSETS.set(file, offset);
 }
-
-// Calling an `async def` from JavaScript returns a coroutine that nobody runs:
-// the handler appears to do nothing at all, silently. Brython has its own event
-// loop, so hand it over.
-export function schedule(result, where, lineOffset = 0) {
-    const $B = globalThis.__BRYTHON__;
-    const aio = $B.imported['browser.aio'];
-
-    if (!aio || result === undefined || result === null) return result;
-
-    // Compared in JavaScript rather than through aio.iscoroutine(): this runs on
-    // every call into Python, template expressions included, and a Brython call
-    // here costs more than the check saves.
-    if ($B.get_class(result) !== $B.coroutine) return result;
-
-    // What the caller gets back is a promise, so an `async def` can be awaited
-    // by whoever called it. `run(coro, onsuccess, onerror)`: its default onerror
-    // only logs, so an exception raised inside a coroutine would reach nothing
-    // at all — no error event, no overlay.
-    let watched = false;
-
-    const promise = new Promise((resolve, reject) => {
-        $B.$getattr(aio, 'run')(
-            result,
-            (value) => {
-                $B.leave_frame(); // what Brython's own default does
-                resolve(value);
-            },
-            (error) => {
-                const failure = pyError(error, where, lineOffset);
-                reject(failure);
-
-                // An event handler's return value is dropped on the floor, so
-                // nobody is there to catch this one. Rethrowing from a timeout
-                // turns it into a genuine uncaught error, the way the
-                // synchronous path already behaves — but only when the caller
-                // really did ignore the promise.
-                setTimeout(() => {
-                    if (!watched) throw failure;
-                });
-            }
-        );
-    });
-
-    const settle = promise.then.bind(promise);
-
-    // Handled here so the browser does not *also* report an unhandled
-    // rejection: reporting is this function's job, and it does it above.
-    settle(undefined, () => {});
-
-    promise.then = (...handlers) => {
-        watched = true;
-        return settle(...handlers);
-    };
-
-    return promise;
-}
-
-
-// A Python function seen from JavaScript, wrapped by reading its own signature
-// rather than a declaration we made — the layout is Brython's `$function_infos`:
-// [2] the qualified name, [3] the file, [8] the `*args` name if there is one,
-// [10] how many positional parameters were declared.
-//
-// The original is kept on `$js_func` by Brython's own interop wrapper, and it is
-// the one that answers for the signature.
-function declared(value) {
-    if (typeof value !== 'function') return null;
-
-    const fn = typeof value.$js_func === 'function' ? value.$js_func : value;
-    const infos = fn.$function_infos;
-
-    // `arity` is what the whole thing is for, so a shape that has no number
-    // there is not a Python signature, whatever else it carries.
-    if (!Array.isArray(infos) || (!infos[8] && typeof infos[10] !== 'number')) return null;
-
-    return { fn, where: `${infos[2]}() — ${infos[3]}`, arity: infos[8] ? Infinity : infos[10] };
-}
-
-// A DOM handler. JavaScript calls with whatever it has — Vue hands `$event` to
-// every inline statement — where Python raises on a positional argument it never
-// declared. So the call is trimmed to the signature.
-export function pyEvent(value, lineOffset = 0) {
-    const found = declared(value);
-    if (found === null) return value;
-
-    const { fn: called, where, arity } = found;
-
-    return (...args) => {
-        try {
-            return schedule(called(...args.slice(0, arity)), where, lineOffset);
-        } catch (error) {
-            throw pyError(error, where, lineOffset);
-        }
-    };
-}
-
-
 
 // `pep.title` inside the markup, on a dict.
 //
@@ -440,7 +303,7 @@ export function writeItem(target, key, value) {
 // handlers by identity between renders.
 const templates = new WeakMap();
 
-export function template(fn, where, lineOffset = 0) {
+export function template(fn, where) {
     if (typeof fn !== 'function') return fn;
 
     let wrapped = templates.get(fn);
@@ -454,12 +317,12 @@ export function template(fn, where, lineOffset = 0) {
                 // drops a statement's value — so without this the click ran the
                 // body up to nothing at all and said nothing about it.
                 //
-                // Free on everything else: `schedule` compares the class in
-                // JavaScript and returns at once for a value that is not a
-                // coroutine, which is every other template expression.
-                return schedule(inTemplate(() => fn(...args)), where, lineOffset);
+                // Free on everything else: `scheduleAsync` returns at once for
+                // a value that is not awaitable, which is every other template
+                // expression.
+                return scheduleAsync(inTemplate(() => fn(...args)), where);
             } catch (error) {
-                throw pyError(error, where, lineOffset);
+                throw pyError(error, where);
             }
         };
 
@@ -484,7 +347,7 @@ export function template(fn, where, lineOffset = 0) {
 // Mapped onto Vue's three hooks, which is exactly what they are for.
 const teardowns = new WeakMap();
 
-export function pyDirective(name, lineOffset = 0) {
+export function pyDirective(name) {
     const stop = (el) => {
         const previous = teardowns.get(el);
 
@@ -496,9 +359,9 @@ export function pyDirective(name, lineOffset = 0) {
         stop(el);
 
         const fn = binding.instance && binding.instance[name];
-        const result = pyEvent(fn, lineOffset)(el, binding.value);
+        const result = pyHandler(fn)(el, binding.value);
 
-        if (typeof result === 'function') teardowns.set(el, pyEvent(result, lineOffset));
+        if (typeof result === 'function') teardowns.set(el, pyHandler(result));
     };
 
     return { mounted: run, updated: run, unmounted: stop };

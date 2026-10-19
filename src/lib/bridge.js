@@ -357,43 +357,6 @@ export function pyEvent(value, lineOffset = 0) {
     };
 }
 
-// A module's function, read from Python that lives somewhere else.
-//
-// `$B.imported` holds a plain JavaScript object, so Brython reads a foreign
-// module's namespace as foreign and converts the arguments on the way in — a
-// `dict` would arrive with only its subscript left. Undone rather than
-// prevented: `pyobj2jsobj` records what it converted, so the original is there
-// to hand back, and anything not in the record passes through untouched.
-const boundaries = new WeakMap();
-
-const restored = (value) => {
-    if (value === null || typeof value !== 'object') return value;
-
-    const original = globalThis.__BRYTHON__.$vuythonPyobj?.get(value);
-
-    return original === undefined ? value : original;
-};
-
-export function pyBoundary(fn) {
-    if (typeof fn !== 'function') return fn;
-
-    // Memoised, because Python compares a function by identity: reading
-    // `panier.ajouter` twice has to answer the same object.
-    let wrapped = boundaries.get(fn);
-
-    if (wrapped === undefined) {
-        wrapped = (...args) => fn(...args.map(restored));
-
-        // The wrapper stands in for the Python function, so it answers for it
-        // too: `$function_infos` is where the name, the file and the declared
-        // arity are read from, and losing them leaves every caller downstream
-        // handing a Python signature more arguments than it takes.
-        wrapped.$function_infos = fn.$function_infos;
-        boundaries.set(fn, wrapped);
-    }
-
-    return wrapped;
-}
 
 
 // `pep.title` inside the markup, on a dict.

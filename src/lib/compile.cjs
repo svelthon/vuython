@@ -807,7 +807,7 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
     return [
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
-        `import { bind, hide, track, follow, pyError, pyEvent, pyBoundary, plainData, pyData,` +
+        `import { bind, hide, track, follow, pyError, pyEvent, plainData, pyData,` +
             ` jsCall, registerModule, NONE } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
         ``,
@@ -835,12 +835,11 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
                 `bind(${NS}, '${n}', () => ${ref(n)}.value,` +
                 ` (v) => { ${ref(n)}.value = track(v, ${bump(n)}); });`
         ),
-        // A module's function is read from *another* module, where the namespace
-        // is an ordinary JavaScript object and Brython converts what it is
-        // given. `pyBoundary` undoes that conversion, so the callee sees the
-        // Python it was written for.
+        // A module's function is read from *another* module, whose namespace
+        // Bryntime publishes as a Python module (`registerModule`): Brython
+        // hands it its arguments as they are, a dict as itself.
         ...funcs.map(
-            (f) => `bind(${NS}, '${f.name}', () => pyBoundary(${fn(f.name)}.value), (v) => { ${fn(f.name)}.value = v; });`
+            (f) => `bind(${NS}, '${f.name}', () => ${fn(f.name)}.value, (v) => { ${fn(f.name)}.value = v; });`
         ),
         ...deriveds.map(
             (d) => `bind(${NS}, '${d.name}', () => follow(${memo(d.name)}.value), (v) => { ${fn(d.name)}.value = v; });`

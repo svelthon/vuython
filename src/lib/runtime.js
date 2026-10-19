@@ -1,9 +1,6 @@
-// What every compiled component imports. Order is load-bearing: globals, then
-// Brython, then boot.
-import './globals.js';
-import '../../vendor/brython.js';
-import '../../vendor/sys.js';
-import './boot.js';
+// What every compiled component imports, on Bryntime's engine, which its one
+// entry loads and starts.
+import 'bryntime';
 import { shallowRef } from 'vue';
 
 // Python's None, so a prop the parent never passed reads as None rather than

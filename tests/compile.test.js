@@ -5,6 +5,9 @@
 // document whose currentScript is null.
 import { test, expect, describe } from 'vitest';
 import { createRequire } from 'node:module';
+// The engine, started as the plugin starts it before the compiler adds its
+// parsing chain: `compile.cjs` loads no engine of its own.
+import 'bryntime';
 
 const { compile } = createRequire(import.meta.url)('../src/lib/compile.cjs');
 

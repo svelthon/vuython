@@ -1,8 +1,9 @@
 import { createRequire } from 'node:module';
 import { relative, resolve, dirname } from 'node:path';
 import { readFileSync, existsSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
+// Bryntime's engine, started before the compiler adds its parsing chain to it.
+import 'bryntime';
 import { overTemplate, pythonExpressions, collector, renameModels } from './markup.js';
 
 const require = createRequire(import.meta.url);
@@ -85,34 +86,6 @@ export function vuython(options = {}) {
     return {
         name: 'vuython',
         enforce: 'pre',
-
-        // Every line of Python is compiled at build time, so the *compiler* half
-        // of Brython is dead weight in the bundle — and it is more than half.
-        // The vendored runtime-only build is the same file with `py2js` and the
-        // parser removed; nothing that ships can reach them.
-        //
-        // Only for a build: `vite dev` keeps the full one, because that is where
-        // a compile error has to be able to say something.
-        config(_, { command }) {
-            if (command !== 'build') return;
-
-            return {
-                resolve: {
-                    alias: [
-                        {
-                            // Anchored at both ends: with a regular expression
-                            // Vite replaces only what matched, so a pattern
-                            // covering the tail alone would leave `../../` in
-                            // front of an absolute path.
-                            find: /^.*vendor\/brython\.js$/,
-                            replacement: fileURLToPath(
-                                new URL('../../vendor/brython_runtime.js', import.meta.url)
-                            )
-                        }
-                    ]
-                }
-            };
-        },
 
         resolveId(id, importer) {
             if (id.startsWith(VIRTUAL_PREFIX)) return '\0' + id;

@@ -1,15 +1,37 @@
 {
     "name": "vuython",
     "version": "0.1.0",
-    "description": "Vue single-file components written in Python, compiled by Brython at build time",
-    "private": true,
+    "description": "Vue components in Python",
+    "author": "Florent Gallaire <fgallaire@gmail.com>",
+    "license": "MIT",
+    "keywords": [
+        "python",
+        "vue",
+        "brython",
+        "vite-plugin"
+    ],
     "type": "module",
+    "main": "./src/lib/vuython.js",
+    "exports": {
+        ".": "./src/lib/vuython.js",
+        "./runtime": "./src/lib/runtime.js",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "src/lib"
+    ],
     "scripts": {
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
         "test": "vitest run",
         "coverage": "vitest run --coverage"
+    },
+    "dependencies": {
+        "bryntime": "^0.9.0"
+    },
+    "peerDependencies": {
+        "vue": "^3.5.0"
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^6.0.1",

@@ -4,20 +4,11 @@
 // result in two — a plain ES module holding the generated code, and a Vue
 // component whose `setup()` hands that code its own namespace back.
 //
-// CommonJS because brython.js is a classic script that has to execute *after*
-// the globals below are in place, which ES imports cannot order (they hoist).
-
-globalThis.self ??= globalThis;           // touched by the bootstrap
-globalThis.addEventListener ??= () => {}; // idem
-globalThis.__BRYTHON__ ??= {};
-globalThis.$B ??= globalThis.__BRYTHON__; // the codegen's eval() resolves $B globally
-
-globalThis.$B.$vuythonGlobalsBefore ??= new Set(Object.getOwnPropertyNames(globalThis));
-
-require('../../vendor/brython.js');
+// The engine is Bryntime's, loaded and started by whoever imports `bryntime`
+// first, `vuython.js` here; the compiler adds Brython's parsing chain onto it.
+require('bryntime/compiler');
 
 const $B = globalThis.__BRYTHON__;
-$B.brython({ ipy_id: [] });
 
 const { INJECTED } = require('./injected.cjs');
 
@@ -31,7 +22,7 @@ const NS = '__py';
 // which the runtime does at execution time. This pattern is only checked, never
 // rewritten; if a future codegen stops emitting it, compilation fails loudly
 // instead of producing a component with no reactivity at all.
-const namespaceCall = (name) => `$B.namespace('${name}')`;
+const namespaceCall = (name) => `$B.namespace(${JSON.stringify(name)})`;
 
 // The module id Brython derives from a filename: only '.' becomes '_'.
 const namespaceFor = (filename) => filename.replace(/\./g, '_');

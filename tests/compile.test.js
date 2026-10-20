@@ -4,12 +4,8 @@
 // dereferences `document.currentScript` when it finds one, and jsdom provides a
 // document whose currentScript is null.
 import { test, expect, describe } from 'vitest';
-import { createRequire } from 'node:module';
-// The engine, started as the plugin starts it before the compiler adds its
-// parsing chain: `compile.cjs` loads no engine of its own.
-import 'bryntime';
-
-const { compile } = createRequire(import.meta.url)('../src/lib/compile.cjs');
+// Brycomp, under the compiler, starts the engine and its parsing chain itself.
+import { compile } from '../src/lib/compile.js';
 
 const script = (source, defs = []) => compile(source, 'Probe', 'Probe.vue', { defs }).script;
 

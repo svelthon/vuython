@@ -1,13 +1,9 @@
-import { createRequire } from 'node:module';
 import { relative, resolve, dirname } from 'node:path';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 
-// Bryntime's engine, started before the compiler adds its parsing chain to it.
-import 'bryntime';
+// The compiler, on Brycomp, which starts the engine and its parsing chain itself.
+import { compile, VIRTUAL_PREFIX } from './compile.js';
 import { overTemplate, pythonExpressions, collector, renameModels } from './markup.js';
-
-const require = createRequire(import.meta.url);
-const { compile, VIRTUAL_PREFIX } = require('./compile.cjs');
 
 // Generated modules, keyed by component name. Filled when a component is
 // transformed, read back when Vite resolves the import that transform just

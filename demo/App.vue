@@ -23,7 +23,7 @@
         <p class="eyebrow">Vuython</p>
         <h1><span class="vue">Vue</span> components in <span class="python">Python</span></h1>
         <p class="lead">
-            A demo of integrating Bryntime and Bryc into Vue, independent of Svelthon. Every
+            A demo of integrating Bryntime and Brycomp into Vue, independent of Svelthon. Every
             component on this page is written in Python and compiled by Brython at build time:
             the browser receives only JavaScript.
         </p>
@@ -120,7 +120,8 @@
 
     <footer>
         Built on <a href="https://www.npmjs.com/package/bryntime">Bryntime</a>, the Brython
-        runtime for JavaScript frameworks, and on Bryc, the compiler built on it.
+        runtime for JavaScript frameworks, and on <a href="https://www.npmjs.com/package/brycomp">Brycomp</a>,
+        the Brython compiler for JavaScript frameworks.
     </footer>
 </template>
 

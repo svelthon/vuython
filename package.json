@@ -1,6 +1,6 @@
 {
     "name": "vuython",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Vue components in Python",
     "author": "Florent Gallaire <fgallaire@gmail.com>",
     "license": "MIT",
@@ -28,7 +28,9 @@
         "coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "bryntime": "^0.9.0"
+        "brycomp": "^0.5.2",
+        "bryntime": "^1.0.0",
+        "bryvend": "~3.14.3"
     },
     "peerDependencies": {
         "vue": "^3.5.0"

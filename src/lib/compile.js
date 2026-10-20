@@ -1,167 +1,22 @@
-'use strict';
-
-// Build-time half of Vuython: run Brython's compiler under Node and split the
-// result in two — a plain ES module holding the generated code, and a Vue
-// component whose `setup()` hands that code its own namespace back.
+// Build-time half of Vuython. Brycomp translates the Python, its own common half
+// of a compile; this file says to it what is Vue's (`HOST`), and makes of what
+// it hands back a Vue component whose `setup()` gives that code its own
+// namespace, or a module whose names are refs.
 //
-// The engine is Bryntime's, loaded and started by whoever imports `bryntime`
-// first, `vuython.js` here; the compiler adds Brython's parsing chain onto it.
-require('bryntime/compiler');
+// Brycomp runs on Bryvend, the engine and its parsing chain, which its door loads
+// before anything here reads `__BRYTHON__`.
+import {
+    compile as compileCommon,
+    NS,
+    EXPR_PREFIX,
+    JS_RESERVED,
+    jsImportLine,
+    declaredExports,
+    refuseHostWords
+} from 'brycomp';
+import { INJECTED } from './injected.js';
 
 const $B = globalThis.__BRYTHON__;
-
-const { INJECTED } = require('./injected.cjs');
-
-// Name the generated module gives to the reactive namespace it receives.
-const NS = '__py';
-
-// Brython emits module state into a namespace object:
-//     locals_Counter = $B.namespace('Counter')
-//     locals_Counter.count = 0
-// Nothing lives in a lexical binding, so there is a single call to intercept —
-// which the runtime does at execution time. This pattern is only checked, never
-// rewritten; if a future codegen stops emitting it, compilation fails loudly
-// instead of producing a component with no reactivity at all.
-const namespaceCall = (name) => `$B.namespace(${JSON.stringify(name)})`;
-
-// The module id Brython derives from a filename: only '.' becomes '_'.
-const namespaceFor = (filename) => filename.replace(/\./g, '_');
-
-// The prefix the markup pass gives every function it lifts out of the template.
-const EXPR_PREFIX = '__expr_';
-
-// A Brython exception carries neither `message` nor `stack`, so a Python syntax
-// error would reach Vite as an empty object and be reported as nothing at all.
-function pythonError(error, source, lineOffset) {
-    if (!error || typeof error !== 'object') return error;
-
-    let described = 'SyntaxError';
-    try {
-        const name = $B.$getattr($B.get_class(error), '__name__');
-        described = `${name}: ${$B.builtins.str.$factory(error)}`;
-    } catch {
-        /* not a Python exception after all */
-    }
-
-    let line;
-    try {
-        line = $B.$getattr(error, 'lineno', undefined);
-    } catch {
-        /* no position on it */
-    }
-
-    const at = line === undefined ? source : `${source}:${line + lineOffset}`;
-    const failure = new SyntaxError(`vuython — ${described} (${at})`);
-
-    failure.loc = line === undefined ? undefined : { line: line + lineOffset, column: 0 };
-
-    return failure;
-}
-
-// A source map, so a debugger opens the `.vue` rather than the JavaScript
-// Brython generated from it — and a traceback names a line the author wrote.
-//
-// Brython plants `$B.set_lineno(frame, N)` ahead of every statement it emits, so
-// the mapping is read out of the generated code rather than tracked through the
-// compiler. One segment per generated line, column zero to column zero: that is
-// all a line-oriented language needs, and it is why every pass upstream of this
-// one is careful to preserve line numbers — `importjs` blanks its line instead
-// of removing it for exactly this reason.
-const VLQ_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-function vlq(value) {
-    let rest = value < 0 ? (-value << 1) | 1 : value << 1;
-    let encoded = '';
-
-    do {
-        let digit = rest & 31;
-        rest >>>= 5;
-        if (rest > 0) digit |= 32;
-        encoded += VLQ_CHARS[digit];
-    } while (rest > 0);
-
-    return encoded;
-}
-
-function sourceMap(generated, source, content, lineOffset) {
-    const marker = /\$B\.set_lineno\(frame, (\d+)\)/;
-    const segments = [];
-    let previous = 0;
-    let current = null;
-
-    for (const line of generated.split('\n')) {
-        const found = line.match(marker);
-        if (found) current = Number(found[1]) - 1 + lineOffset;
-
-        if (current === null) {
-            segments.push('');
-            continue;
-        }
-
-        // Everything in a source map is delta-encoded, hence the running
-        // `previous`.
-        segments.push(vlq(0) + vlq(0) + vlq(current - previous) + vlq(0));
-        previous = current;
-    }
-
-    return {
-        version: 3,
-        sources: [source],
-        sourcesContent: [content],
-        names: [],
-        mappings: segments.join(';')
-    };
-}
-
-// `__all__ = ["ajouter"]` — Python's own way of saying what a module exports,
-// and the closest thing it has to JavaScript's `export` keyword. Read from the
-// AST, so it stays a plain assignment in the source.
-function declaredExports(body) {
-    for (const node of body) {
-        if (!(node instanceof $B.ast.Assign)) continue;
-        if (!node.targets.some((t) => t instanceof $B.ast.Name && t.id === '__all__')) continue;
-
-        const items = node.value?.elts;
-        if (!items) continue;
-
-        return items
-            .map((item) => (item instanceof $B.ast.Constant ? item.value : null))
-            .filter((one) => typeof one === 'string');
-    }
-
-    return null;
-}
-
-// `__js__ = {"./helpers.js": ["shout"]}` — the JavaScript a plain `.py` needs.
-//
-// A module has no markup, so it never asks for the three shapes that are
-// template concerns: a default export (a child component), a stylesheet imported
-// for its effect, a namespace for `<Dialog.Root>`. Only the named form is left,
-// which is all a module ever wants — so this can stay real Python, read off the
-// AST, where `importjs` had to become a keyword.
-function declaredJsImports(body) {
-    for (const node of body) {
-        if (!(node instanceof $B.ast.Assign)) continue;
-        if (!node.targets.some((t) => t instanceof $B.ast.Name && t.id === '__js__')) continue;
-        if (!node.value || !node.value.keys) continue;
-
-        const modules = [];
-
-        node.value.keys.forEach((key, index) => {
-            const names = (node.value.values[index].elts || [])
-                .map((one) => (one instanceof $B.ast.Constant ? one.value : null))
-                .filter((one) => typeof one === 'string' && /^[A-Za-z_$][\w$]*$/.test(one));
-
-            if (key instanceof $B.ast.Constant && names.length) {
-                modules.push({ from: key.value, names });
-            }
-        });
-
-        return modules;
-    }
-
-    return [];
-}
 
 // `doubled => count * 2` — a name bound to an expression that re-runs, which is
 // the arrow Svelthon already carries. Nothing about it is Svelte's: it names a
@@ -189,136 +44,6 @@ const BINDABLE = /^([A-Za-z_]\w*\s*:\s*[^=<>]+?)\s*<=>\s*(\S[\s\S]*)?$/;
 const INSPECT = /^inspect(_with)?\s*\((\s*\S[\s\S]*)\)\s*$/;
 
 const ARROW_INDENTED = /^[ \t]+(?:[A-Za-z_]\w*\s*)?=>\s/;
-
-// `importjs` — a component's JavaScript imports, written where its Python is.
-//
-// A keyword rather than a declaration read from the AST. `__all__` is real
-// Python and the compiler only reads it; a dict literal wearing the same costume
-// invites being computed — which parses, raises nothing, and does not work. A
-// keyword makes that unwriteable instead of merely wrong.
-//
-// The clause is JavaScript's own, since the keyword has already announced that
-// much. There is nothing new to learn, and no ambiguity to invent between a
-// default import and a named one.
-//
-// It matters more here than it does under Svelte. Svelte resolves `<Notes />` to
-// whatever lexical binding it finds; Vue calls `resolveComponent("Notes")`,
-// which reads the `components` option. So a default or namespace import is not
-// only a value Python can name — it is a **component registration**, and without
-// one a Vuython component could not name another at all.
-const IMPORTJS = /^importjs\b/;
-const IMPORTJS_ANYWHERE = /^[ \t]+importjs\b/;
-const IMPORTJS_CLAUSE = /^importjs\s+([\s\S]*?)\s+from\s+(['"])([^'"]+)\2\s*$/;
-const IMPORTJS_EFFECT = /^importjs\s+(['"])([^'"]+)\1\s*$/;
-const JS_NAME = /^[A-Za-z_$][\w$]*$/;
-
-function importJsClause(line, where) {
-    const bare = line.match(IMPORTJS_EFFECT);
-    if (bare) return { from: bare[2], kind: 'effect', entries: [] };
-
-    const found = line.match(IMPORTJS_CLAUSE);
-    if (!found) {
-        throw new SyntaxError(
-            `vuython — importjs expects \`importjs <clause> from "module"\` or ` +
-                `\`importjs "module"\`, on one line (${where})`
-        );
-    }
-
-    const clause = found[1].trim();
-    const from = found[3];
-
-    const star = clause.match(/^\*\s+as\s+([A-Za-z_$][\w$]*)$/);
-    if (star) return { from, kind: 'namespace', entries: [{ name: null, local: star[1] }] };
-
-    // `{a, b as c}` — the names between the braces, each optionally renamed.
-    const namedEntries = (inner) => {
-        const entries = inner
-            .split(',')
-            .map((one) => one.trim())
-            .filter(Boolean)
-            .map((one) => {
-                const renamed = one.match(/^([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)$/);
-                if (renamed) return { name: renamed[1], local: renamed[2] };
-                if (JS_NAME.test(one)) return { name: one, local: one };
-
-                throw new SyntaxError(`vuython — importjs: \`${one}\` is not a name (${where})`);
-            });
-
-        if (!entries.length) throw new SyntaxError(`vuython — importjs: empty {} (${where})`);
-        return entries;
-    };
-
-    const braced = clause.match(/^\{([\s\S]*)\}$/);
-    if (braced) return { from, kind: 'named', entries: namedEntries(braced[1]) };
-
-    // `Player, {stopAll}` — the default and some names, from the same module.
-    // The default comes first in `entries`, marked by a null `name`.
-    const mixed = clause.match(/^([A-Za-z_$][\w$]*)\s*,\s*\{([\s\S]*)\}$/);
-    if (mixed) {
-        return {
-            from,
-            kind: 'mixed',
-            entries: [{ name: null, local: mixed[1] }, ...namedEntries(mixed[2])]
-        };
-    }
-
-    if (JS_NAME.test(clause)) {
-        return { from, kind: 'default', entries: [{ name: null, local: clause }] };
-    }
-
-    throw new SyntaxError(`vuython — importjs: \`${clause}\` is not an import clause (${where})`);
-}
-
-// Lift every `importjs` out of the source, leaving the line blank behind it.
-//
-// Blank rather than removed: a line-preserving pass costs the tracebacks and
-// `$B.set_lineno` exactly nothing.
-function takeImportJs(src, where, lineOffset) {
-    const lines = src.split('\n');
-    const imports = [];
-    const kept = [];
-    let quote = null;
-
-    for (let n = 0; n < lines.length; n++) {
-        const line = lines[n];
-        const at = `${where}:${n + 1 + lineOffset}`;
-
-        if (quote === null && IMPORTJS_ANYWHERE.test(line)) {
-            // A JavaScript import is hoisted and static; there is no such thing
-            // as one inside a branch, and silently hoisting it would be a lie.
-            throw new SyntaxError(`vuython — importjs must start the line, at the top level (${at})`);
-        }
-
-        if (quote === null && IMPORTJS.test(line)) {
-            imports.push(importJsClause(line.trim(), at));
-            kept.push('');
-            continue;
-        }
-
-        kept.push(line);
-        quote = endQuote(line, quote);
-    }
-
-    return { source: kept.join('\n'), imports };
-}
-
-// One import statement, in whichever of the five shapes it was declared.
-function jsImportLine(one) {
-    const from = JSON.stringify(one.from);
-    const list = (entries) =>
-        entries.map((e) => (e.name === e.local ? e.local : `${e.name} as ${e.local}`)).join(', ');
-
-    if (one.kind === 'effect') return `import ${from};`;
-    if (one.kind === 'namespace') return `import * as ${one.entries[0].local} from ${from};`;
-    if (one.kind === 'default') return `import ${one.entries[0].local} from ${from};`;
-
-    if (one.kind === 'mixed') {
-        const [first, ...rest] = one.entries;
-        return `import ${first.local}, { ${list(rest)} } from ${from};`;
-    }
-
-    return `import { ${list(one.entries)} } from ${from};`;
-}
 
 // What a template may name as a tag. A default import is how a child component
 // arrives — 25 of the 65 imports measured across the Svelthon projects — and a
@@ -449,11 +174,6 @@ const hasDottedDecorator = (node, name, attribute) =>
 // Where a statement keeps the statements it holds.
 const BODIES = ['body', 'orelse', 'finalbody', 'handlers', 'cases', 'items'];
 
-const JS_RESERVED = new Set(`break case catch class const continue debugger default delete do else
-export extends finally for function if import in instanceof new return super switch this throw try
-typeof var void while with yield enum implements interface package private protected public static
-null true false await let`.split(/\s+/));
-
 // The surface of a module: every name declared at its top level, sorted by what
 // the emission has to build for it.
 //
@@ -568,45 +288,6 @@ const injections = (declared, component) =>
         (one) => `bind(${NS}, '${one.name}', ${one.value}, () => {});`
     );
 
-// A locked name is Vuython's own word, not a builtin to shadow: refused rather
-// than quietly given to either side. Scoped like the injection itself, so a
-// component-only word is free in a plain `.py`.
-function refuseLocked(declared, component, source) {
-    const taken = INJECTED.find(
-        (one) => one.locked && (component || !one.component) && declared.includes(one.name)
-    );
-
-    if (!taken) return;
-
-    throw new SyntaxError(
-        `vuython — \`${taken.name}\` is one of Vuython's own words and cannot be ` +
-            `redefined (${source})`
-    );
-}
-
-// The modules a `from x import y` names. Brython's own bookkeeping —
-// `root.imports` — records `import x` and nothing else, so `from panier import
-// ajouter` would be invisible to the prelude that resolves a sibling `.py`, and
-// the component would compile cleanly then fail in the browser on a module it
-// had never been given.
-//
-// Asked of the text rather than the AST: the walk is the precise answer, but it
-// leans on Brython's AST classes, and a build reaching the browser through a
-// bundler ends up with a second set of them where the walk quietly matches
-// nothing. The cost of asking this way is a name listed that was already going
-// to be.
-const FROM_IMPORT = /^[ \t]*from\s+([A-Za-z_][\w.]*)\s+import\s/gm;
-
-function fromImportsInSource(src) {
-    const names = [];
-    let found;
-
-    FROM_IMPORT.lastIndex = 0;
-    while ((found = FROM_IMPORT.exec(src))) names.push(found[1].split('.')[0]);
-
-    return names;
-}
-
 // `src/panier.py` → `panier`, the name Python imports it by.
 //
 // One kind of file, where Svelthon needs two. Svelte's `panier.svelte.ts` has to
@@ -620,52 +301,53 @@ const pythonModuleName = (source) => source.split('/').pop().replace(/\.py$/, ''
 const VIRTUAL_PREFIX = 'virtual:vuython/';
 const virtualId = (name) => VIRTUAL_PREFIX + name;
 
+// What is Vue's, said to Brycomp: the name every refusal is said under, the module
+// the generated code imports its runtime from and the names it reaches it by,
+// Vuython's own words, what stands in for a standard module, the option a
+// module is also found on, and Vuython's own syntax, `=>` and `<=>`, made
+// Python before the translation.
+const HOST = {
+    name: 'vuython',
+    bridge: 'vuython/bridge',
+    runtime: { withNamespace: 'withNamespace', pyError: 'pyError' },
+    reserved: {
+        words: INJECTED.filter((one) => one.locked).map((one) => ({ name: one.name, component: one.component === true })),
+        said: 'The helpers, `date`, `slugify`, `tojson` and the rest, may still be shadowed; the decorators may not.'
+    },
+    instead: {
+        json: '`from_json(text)` reads JSON and `tojson(value)` writes it',
+        math: '`abs`, `round`, `min`, `max` and `pow` are builtins, and `js.Math` holds the rest',
+        random: '`js.Math.random()` draws a number',
+        datetime: '`date` and `fromnow` show a date, and `js.Date` reads the clock',
+        time: '`js.Date.now()` reads the clock'
+    },
+    pathOption: 'path',
+    rewrite: (text, { source, lineOffset }) => takeArrows(text, source, lineOffset)
+};
+
 function compile(
     src,
     name = 'Component',
     source = name,
     { defs = [], lineOffset = 0, title = name, module: asModule = false, sourceContent = null } = {}
 ) {
-    // A `<script>` body sits inside markup and every Vue example indents it one
-    // level; in JavaScript that is whitespace, in Python it is syntax. Brython's
-    // own `unindent` is what it already runs on every `<script type="text/
-    // python">`, so the two tags behave alike.
-    //
-    // A `.py` gets neither half: a file is not an embedded block, so an indented
-    // one is a mistake rather than a convenience, and a module has no template
-    // to collect from.
-    //
-    // The dedent has to happen **before** the template defs are appended: those
-    // are generated at column zero and would trip its conservative bail — one
-    // non-blank line already at column zero and the source comes back untouched.
-    const body = asModule ? src : $B.unindent(src);
-
-    src = defs.length ? `${body}\n${defs.join('\n\n')}\n` : body;
-
-    // Both lifted before py2js: neither is Python, and Brython would rightly
-    // refuse them.
-    const lifted = takeImportJs(src, source, lineOffset);
-
-    src = takeArrows(lifted.source, source, lineOffset);
-
-    // Brython reads the source back out of this cache to quote the offending
-    // line, and `compiler_error` does it without checking: an unregistered
-    // filename turns every compile error into `Cannot read properties of
-    // undefined`. That covers `return` outside a function, `break` outside a
-    // loop: the mistakes a beginner actually makes.
-    $B.file_cache[source] = src;
-
-    let root;
-    try {
-        root = $B.py2js({ src, filename: source }, name, [name]);
-    } catch (error) {
-        throw pythonError(error, source, lineOffset);
-    }
+    // Brycomp's common half: a component's script dedented and joined with the
+    // functions its template compiled to (a `.py` is a file, taken as it is),
+    // `importjs` lifted, Vuython's syntax made Python, the translation, and
+    // the module that holds the code, with its source map.
+    const compiled = compileCommon(HOST, src, {
+        name,
+        source,
+        component: !asModule,
+        named: asModule ? pythonModuleName(source) : null,
+        defs,
+        lineOffset,
+        sourceContent
+    });
+    const { root, table, namespace, module, map, jsImports, imported } = compiled;
 
     let { props, bindables, state, funcs, deriveds, effects, inspects, reserved } =
         surface(root._ast.body);
-    const js = root.to_js();
-    const namespace = namespaceFor(source);
 
     // A module has no parent, so an annotation there declares plain state, and a
     // prop would be meaningless.
@@ -690,13 +372,6 @@ function compile(
         }
     }
 
-    if (!js.includes(namespaceCall(namespace))) {
-        throw new Error(
-            `vuython: the code generated for ${source} never calls ${namespaceCall(namespace)} — ` +
-                `Brython's codegen no longer exposes the module namespace where Vuython hooks it`
-        );
-    }
-
     const declared = [
         ...props, ...bindables, ...state,
         ...funcs.map((f) => f.name),
@@ -705,47 +380,22 @@ function compile(
         ...inspects.map((i) => i.name)
     ];
 
-    refuseLocked([...declared, ...reserved], !asModule, source);
+    refuseHostWords(HOST, [...declared, ...reserved], !asModule, source, new Map(), lineOffset);
 
-    const module = [
-        `import { withNamespace, pyError, placed } from 'vuython/bridge';`,
-        ``,
-        // Where this file's Python starts, for every error a frame of it names.
-        `placed(${JSON.stringify(source)}, ${lineOffset});`,
-        ``,
-        `export function init(${NS}) {`,
-        `  try {`,
-        `    return withNamespace('${namespace}', ${NS}, () => {`,
-        js,
-        `    });`,
-        `  } catch (err) { throw pyError(err, ${JSON.stringify(source)}); }`,
-        `}`
-    ].join('\n');
+    // `__all__`, read as Python reads it (Brycomp's `declaredExports`).
+    const declaration = declaredExports(HOST, root._ast, table, source, lineOffset, compiled.src);
 
-    // The two declarations meet here, in one shape: `__js__` is the module's and
-    // only ever names, `importjs` is the component's and covers all five forms.
+    // The JavaScript the source imports comes back in one shape, `__js__` and
+    // `importjs` alike.
     const surfaced = {
         props, bindables, state, funcs, deriveds, effects, inspects, declared, title,
-        jsImports: [
-            ...declaredJsImports(root._ast.body).map((one) => ({
-                from: one.from,
-                kind: 'named',
-                entries: one.names.map((n) => ({ name: n, local: n }))
-            })),
-            ...lifted.imports
-        ],
-        declaredNames: declaredExports(root._ast.body)
+        jsImports,
+        declaredNames: declaration === null ? null : declaration.names
     };
 
-    // Everything a `import panier` in this file will need evaluated before
+    // Everything an `import cart` in this file will need evaluated before
     // init() runs, so the namespace is registered by the time Brython looks it
-    // up. Both spellings are asked, since neither says which it is.
-    const imports = [
-        ...new Set([...Object.keys(root.imports), ...fromImportsInSource(src)])
-    ];
-
-    const map = sourceMap(js, source, sourceContent ?? src, lineOffset);
-
+    // up: the modules the source imports, `import` and `from … import` alike.
     return {
         script: asModule
             ? moduleScript(name, source, namespace, lineOffset, surfaced)
@@ -753,7 +403,7 @@ function compile(
         module,
         map,
         bindables,
-        imports
+        imports: imported
     };
 }
 
@@ -811,8 +461,10 @@ function moduleScript(name, source, namespace, lineOffset, surfaced) {
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
         `import { bind, hide, track, follow, pyError, pyHandler, plainData, pyData,` +
-            ` jsCall, registerModule, NONE } from 'vuython/bridge';`,
+            ` jsCall, registerModule, NONE, placed } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
+        // Where this file's Python starts, for every error a frame of it names.
+        `placed(${JSON.stringify(source)}, ${lineOffset});`,
         ``,
         ...state.flatMap((n) => [
             `const ${ref(n)} = shallowRef(undefined);`,
@@ -948,8 +600,10 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
         `import { init } from ${JSON.stringify(virtualId(name))};`,
         `import { ${imported.join(', ')} } from 'vue';`,
         `import { bind, hide, track, follow, template, pyError, pyHandler, plainData, pyData,` +
-            ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE } from 'vuython/bridge';`,
+            ` jsCall, writeAttr, writeItem, ticking, pyDirective, __pybridge, NONE, placed } from 'vuython/bridge';`,
         ...jsImports.map(jsImportLine),
+        // Where this file's Python starts, for every error a frame of it names.
+        `placed(${JSON.stringify(source)}, ${lineOffset});`,
         ``,
         `export default {`,
         `  name: ${JSON.stringify(title)},`,
@@ -1155,4 +809,4 @@ function componentScript(name, source, namespace, lineOffset, surfaced) {
     ].join('\n');
 }
 
-module.exports = { compile, VIRTUAL_PREFIX, virtualId, surface, takeArrows, EXPR_PREFIX };
+export { compile, VIRTUAL_PREFIX, virtualId, surface, takeArrows, EXPR_PREFIX };

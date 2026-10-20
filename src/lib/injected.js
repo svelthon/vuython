@@ -1,8 +1,6 @@
-'use strict';
-
-// Data, and deliberately on its own: `compile.cjs` boots a Brython interpreter
-// the moment it is required, so anything that only wants to read this list — a
-// test, a tool — would be starting one for nothing.
+// Data, and deliberately on its own: `compile.js` loads Brycomp, which starts the
+// engine and its parsing chain the moment it is imported, so anything that only
+// wants to read this list — a test, a tool — would be starting one for nothing.
 
 // Everything the compiler publishes into a module's namespace, in one place.
 //
@@ -274,4 +272,4 @@ const INJECTED = [
     }
 ];
 
-module.exports = { INJECTED };
+export { INJECTED };

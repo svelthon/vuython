@@ -2,9 +2,11 @@
 
 **Vue components in Python.**
 
-A demo of integrating Bryntime and Bryc into Vue, independent of Svelthon. It
-runs on [Bryntime](https://www.npmjs.com/package/bryntime), the Brython runtime
-for JavaScript frameworks, and on Bryc, the compiler built on it.
+A demo of integrating Bryntime and Brycomp into Vue, independent of Svelthon.
+It runs on [Bryntime](https://www.npmjs.com/package/bryntime), the Brython
+runtime for JavaScript frameworks, and on
+[Brycomp](https://www.npmjs.com/package/brycomp), the Brython compiler for
+JavaScript frameworks.
 
 ```vue
 <script lang="python">
@@ -153,6 +155,6 @@ is no `host()`, Svelte's custom-element hook.
 Svelthon is the same idea on Svelte, and further along. Vuython was first built
 from its parts; it now depends on nothing of Svelthon's. What the two share,
 the crossings between Python and JavaScript, the mutation tracking and the
-module system, is Bryntime, which both depend on, and the compiler is Bryc.
+module system, is Bryntime, which both depend on, and the compiler is Brycomp.
 What is Vue's, the host Bryntime talks to and the template, is Vuython's own
 (`vuython/bridge`).

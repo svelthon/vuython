@@ -31,6 +31,6 @@
 </script>
 
 <template>
-    <p>{{ ticks }} ticks every {{ step }} ms, mounted: {{ mounted }}</p>
+    <p class="result">{{ ticks }} ticks every {{ step }} ms, mounted: {{ mounted }}</p>
     <button @click="faster()">faster</button>
 </template>

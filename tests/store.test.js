@@ -23,7 +23,7 @@ describe('a shared .py module', () => {
     test('carries state between two components', async () => {
         const page = mount(Shop);
 
-        await page.findAll('button')[0].trigger('click');
+        await page.findAll('.catalog button')[0].trigger('click');
         await nextTick();
 
         expect(page.get('.summary').text()).toBe('1 item(s), €3');
@@ -35,8 +35,8 @@ describe('a shared .py module', () => {
     test('and a mutation made inside the module reaches both of them', async () => {
         const page = mount(Shop);
 
-        await page.findAll('button')[0].trigger('click');
-        await page.findAll('button')[1].trigger('click');
+        await page.findAll('.catalog button')[0].trigger('click');
+        await page.findAll('.catalog button')[1].trigger('click');
         await nextTick();
 
         expect(page.get('.summary').text()).toBe('2 item(s), €5');

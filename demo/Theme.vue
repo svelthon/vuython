@@ -13,6 +13,8 @@
 </script>
 
 <template>
-    <button @click="toggle()">toggle</button>
-    <Badge />
+    <div class="row">
+        <button @click="toggle()">toggle</button>
+        <Badge />
+    </div>
 </template>

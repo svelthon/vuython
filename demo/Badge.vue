@@ -8,5 +8,5 @@
 </script>
 
 <template>
-    <p class="badge">{{ color }}</p>
+    <p class="badge" :data-color="color">{{ color }}</p>
 </template>

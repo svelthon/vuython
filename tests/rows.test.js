@@ -14,7 +14,7 @@ test('a dot on a dict finds a key', () => {
 // Attribute first, so a dict's real methods keep winning: `.items` is the
 // method, not a key of that name. The rule costs a dict nothing it had.
 test('and an attribute still wins over a key', () => {
-    expect(mount(Rows).get('p').text()).toContain('4 — 2');
+    expect(mount(Rows).get('p').text()).toContain('total 4 · 2 keys');
 });
 
 // A container held inside another one comes under the same watch, the first
@@ -23,10 +23,10 @@ test('and an attribute still wins over a key', () => {
 test('a nested container mutated in place still moves the page', async () => {
     const page = mount(Rows);
 
-    expect(page.get('p').text()).toContain('4 — 2');
+    expect(page.get('p').text()).toContain('total 4 · 2 keys');
 
     await page.findAll('li')[0].get('button').trigger('click');
 
     expect(page.findAll('li')[0].text()).toContain('lentils: 4');
-    expect(page.get('p').text()).toContain('5 — 2');
+    expect(page.get('p').text()).toContain('total 5 · 2 keys');
 });

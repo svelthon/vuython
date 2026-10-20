@@ -12,9 +12,11 @@
     <!-- `[name, price]` and not `(name, price)`: Vue's parenthesised alias means
          (value, index), so the second name would be the row number. A Python
          tuple is a JavaScript array, so array destructuring unpacks it. -->
-    <button v-for="[name, price] in catalog" :key="name" @click="cart.add(name, price)">
-        {{ name }}, €{{ price }}
-    </button>
+    <div class="row catalog">
+        <button v-for="[name, price] in catalog" :key="name" @click="cart.add(name, price)">
+            {{ name }}, €{{ price }}
+        </button>
+    </div>
 
     <Cart />
 </template>

@@ -8,5 +8,5 @@
 </script>
 
 <template>
-    <p>{{ greeting }}</p>
+    <p class="greeting">{{ greeting }}</p>
 </template>

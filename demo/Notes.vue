@@ -16,20 +16,20 @@
 </script>
 
 <template>
-    <form @submit.prevent="add()">
+    <form class="row" @submit.prevent="add()">
         <!-- v-model on a Python name needs no rewriting: the name is a property
              of the very object setup() returned. -->
         <input v-model="entry" type="number" placeholder="a grade">
         <button :disabled="entry == ''">add</button>
     </form>
 
-    <ul>
+    <ul class="chips">
         <li v-for="note in notes" :key="note">
             {{ note }}
-            <button @click="remove(note)">x</button>
+            <button @click="remove(note)" aria-label="remove">x</button>
         </li>
     </ul>
 
-    <p v-if="notes">average: {{ average }}</p>
-    <p v-else>no grades</p>
+    <p v-if="notes" class="result">average: {{ average }}</p>
+    <p v-else class="result">no grades</p>
 </template>

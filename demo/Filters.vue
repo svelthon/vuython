@@ -7,13 +7,26 @@
 </script>
 
 <template>
-    <p class="slug">{{ slugify(title) }}</p>
-    <p class="date">{{ date(when, "long", None, "en-US") }}</p>
-    <p class="json">{{ tojson(item) }}</p>
-    <p class="strip">{{ striptags(html) }}</p>
-    <p class="url">{{ urlencode({"q": "a/b"}) }}</p>
-    <tr v-for="row in batch(numbers, 2, 0)" :key="row[0]">
-        <td v-for="cell in row" :key="cell">{{ cell }}</td>
-    </tr>
-    <p class="since">{{ fromnow(when, "en-US") }}</p>
+    <dl class="pairs">
+        <dt>slugify</dt>
+        <dd class="slug">{{ slugify(title) }}</dd>
+        <dt>date</dt>
+        <dd class="date">{{ date(when, "long", None, "en-US") }}</dd>
+        <dt>fromnow</dt>
+        <dd class="since">{{ fromnow(when, "en-US") }}</dd>
+        <dt>tojson</dt>
+        <dd class="json">{{ tojson(item) }}</dd>
+        <dt>striptags</dt>
+        <dd class="strip">{{ striptags(html) }}</dd>
+        <dt>urlencode</dt>
+        <dd class="url">{{ urlencode({"q": "a/b"}) }}</dd>
+        <dt>batch</dt>
+        <dd>
+            <table class="batch">
+                <tr v-for="row in batch(numbers, 2, 0)" :key="row[0]">
+                    <td v-for="cell in row" :key="cell">{{ cell }}</td>
+                </tr>
+            </table>
+        </dd>
+    </dl>
 </template>

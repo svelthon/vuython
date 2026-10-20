@@ -9,6 +9,8 @@
 </script>
 
 <template>
-    <input v-model="value">
-    <button @click="clear()">clear</button>
+    <div class="row">
+        <input v-model="value" placeholder="type here">
+        <button @click="clear()">clear</button>
+    </div>
 </template>

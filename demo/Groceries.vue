@@ -20,19 +20,27 @@
 
     <!-- `{ id, name }` destructures a Brython dict: its keys are ordinary
          JavaScript properties, so Vue's own destructuring reaches them. -->
-    <p v-for="{ id, name } in stock" :key="id" class="destructure">{{ id }}:{{ name }}</p>
+    <p class="row">
+        unpacked
+        <code v-for="{ id, name } in stock" :key="id" class="destructure">{{ id }}:{{ name }}</code>
+    </p>
 
     <!-- v-model over an array, which is Svelte's `bind:group`. Nothing here is
          ours: the name is a property of the object setup() returned. -->
-    <input type="checkbox" value="rice" v-model="ticked">
-    <input type="checkbox" value="salt" v-model="ticked">
-    <p class="ticked">{{ ticked }}</p>
+    <div class="row">
+        <label><input type="checkbox" value="rice" v-model="ticked"> rice</label>
+        <label><input type="checkbox" value="salt" v-model="ticked"> salt</label>
 
-    <!-- What the directive wrote has to be a real list, not a JavaScript array
-         wearing the name: `.append` is the test that tells them apart. -->
-    <button class="add" @click="ticked.append('pepper')">add</button>
+        <!-- What the directive wrote has to be a real list, not a JavaScript
+             array wearing the name: `.append` is the test that tells them
+             apart. -->
+        <button class="add" @click="ticked.append('pepper')">add pepper</button>
+    </div>
+    <p>ticked <code class="ticked">{{ ticked }}</code></p>
 
-    <input type="radio" value="a" v-model="choice">
-    <input type="radio" value="b" v-model="choice">
-    <p class="choice">{{ choice }}</p>
+    <div class="row">
+        <label><input type="radio" value="a" v-model="choice"> a</label>
+        <label><input type="radio" value="b" v-model="choice"> b</label>
+    </div>
+    <p>picked <code class="choice">{{ choice }}</code></p>
 </template>

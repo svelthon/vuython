@@ -8,6 +8,8 @@
 
 <template>
     <p class="summary">{{ cart.summary }}</p>
-    <li v-for="line in cart.lines" :key="line.name">{{ line.name }}</li>
+    <ul class="lines">
+        <li v-for="line in cart.lines" :key="line.name">{{ line.name }}</li>
+    </ul>
     <button class="empty" @click="cart.empty()">empty</button>
 </template>

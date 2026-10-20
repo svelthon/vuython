@@ -16,7 +16,7 @@
 </script>
 
 <template>
-    <p class="a">{{ loud("bonjour") }}</p>
+    <p class="a">{{ loud("hello") }}</p>
     <p class="b">{{ echo("x") }}</p>
     <p class="c">{{ doubled_half }}</p>
     <p class="d">{{ named("x") }} / {{ helpers.shout("y") }}</p>

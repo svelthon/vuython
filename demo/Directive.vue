@@ -1,5 +1,5 @@
 <script lang="python">
-    couleur = "gold"
+    color = "gold"
     visible = True
     trace = []
 
@@ -8,28 +8,28 @@
     # the node and the value, called again when the value moves, and whatever it
     # returns is its destructor.
     @directive
-    def surligne(node, valeur):
-        node.style.backgroundColor = valeur
-        trace.append(f"pose {valeur}")
+    def highlight(node, value):
+        node.style.backgroundColor = value
+        trace.append(f"set {value}")
 
-        def enleve():
-            trace.append("retire")
+        def remove():
+            trace.append("unset")
 
-        return enleve
+        return remove
 
-    def basculer():
-        global couleur
-        couleur = "deepskyblue" if couleur == "gold" else "gold"
+    def recolor():
+        global color
+        color = "deepskyblue" if color == "gold" else "gold"
 
-    def cacher():
+    def hide():
         global visible
         visible = not visible
 </script>
 
 <template>
-    <p v-if="visible" v-surligne="couleur" class="cible">surligné</p>
-    <button class="couleur" @click="basculer()">changer</button>
-    <button class="cacher" @click="cacher()">cacher</button>
+    <p v-if="visible" v-highlight="color" class="target">highlighted</p>
+    <button class="color" @click="recolor()">change</button>
+    <button class="hide" @click="hide()">hide</button>
 
     <!-- `trace` is deliberately *not* rendered. A directive runs while Vue is
          patching, so writing a name the template reads would invalidate the

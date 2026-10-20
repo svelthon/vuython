@@ -9,12 +9,12 @@ import App from '../demo/App.vue';
 // the compiler resolves; under Vue it has to reach the `components` option, or
 // `resolveComponent` finds nothing and the tag renders as an unknown element.
 test('a default import registers a child component', () => {
-    expect(mount(App).html()).toContain('moyenne : 11.7');
+    expect(mount(App).html()).toContain('average: 11.7');
 });
 
 describe('a JavaScript name reached from Python', () => {
     test('is callable, and the arguments cross as Python', () => {
-        expect(mount(Interop).get('.a').text()).toBe('BONJOUR !');
+        expect(mount(Interop).get('.a').text()).toBe('HELLO!');
     });
 
     // The other direction: a Python callable handed to JavaScript, which cannot
@@ -31,6 +31,6 @@ describe('a JavaScript name reached from Python', () => {
     });
 
     test('under every clause the keyword accepts', () => {
-        expect(mount(Interop).get('.d').text()).toBe('default:x / Y !');
+        expect(mount(Interop).get('.d').text()).toBe('default:x / Y!');
     });
 });

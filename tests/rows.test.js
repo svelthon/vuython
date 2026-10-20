@@ -8,7 +8,7 @@ import Rows from '../demo/Rows.vue';
 // for the length of one expression and nowhere else, so the script keeps
 // Python's own meaning of the dot.
 test('a dot on a dict finds a key', () => {
-    expect(mount(Rows).findAll('li')[0].text()).toContain('lentilles : 3');
+    expect(mount(Rows).findAll('li')[0].text()).toContain('lentils: 3');
 });
 
 // Attribute first, so a dict's real methods keep winning: `.items` is the
@@ -27,6 +27,6 @@ test('a nested container mutated in place still moves the page', async () => {
 
     await page.findAll('li')[0].get('button').trigger('click');
 
-    expect(page.findAll('li')[0].text()).toContain('lentilles : 4');
+    expect(page.findAll('li')[0].text()).toContain('lentils: 4');
     expect(page.get('p').text()).toContain('5 — 2');
 });

@@ -17,15 +17,15 @@ describe('an async def', () => {
     test('runs, and its writes reach the page as it goes', async () => {
         const page = mount(Async);
 
-        await page.get('.charger').trigger('click');
+        await page.get('.load').trigger('click');
         await nextTick();
 
         // The body up to the first `await` has already run.
-        expect(page.get('.etat').text()).toBe('en cours');
+        expect(page.get('.state').text()).toBe('loading');
 
         await settle();
 
-        expect(page.get('.etat').text()).toBe('reçu : des lentilles');
+        expect(page.get('.state').text()).toBe('received: lentils');
     });
 
     // Brython's own loop, not the platform's: `aio.sleep` is a coroutine that
@@ -33,10 +33,10 @@ describe('an async def', () => {
     test('and awaits Brython s own primitives too', async () => {
         const page = mount(Async);
 
-        await page.get('.dormir').trigger('click');
+        await page.get('.sleep').trigger('click');
         await settle();
 
-        expect(page.get('.etat').text()).toBe('réveillé');
+        expect(page.get('.state').text()).toBe('awake');
     });
 
     // A rejected promise has to arrive as a Python exception, or `except` never
@@ -44,9 +44,9 @@ describe('an async def', () => {
     test('and a rejection is catchable as a Python exception', async () => {
         const page = mount(Async);
 
-        await page.get('.casser').trigger('click');
+        await page.get('.crash').trigger('click');
         await settle();
 
-        expect(page.get('.erreur').text()).toContain('cassé');
+        expect(page.get('.error').text()).toContain('broken');
     });
 });

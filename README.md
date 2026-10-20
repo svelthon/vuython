@@ -10,16 +10,16 @@ for JavaScript frameworks, and on Bryc, the compiler built on it.
 <script lang="python">
     notes = [12, 15, 8]
 
-    moyenne => round(sum(notes) / len(notes), 1)
+    average => round(sum(notes) / len(notes), 1)
 
-    def ajouter(note):
+    def add(note):
         notes.append(note)
 </script>
 
 <template>
     <li v-for="note in notes">{{ note }}</li>
-    <p>moyenne : {{ moyenne }}</p>
-    <button @click="ajouter(15)">ajouter 15</button>
+    <p>average: {{ average }}</p>
+    <button @click="add(15)">add 15</button>
 </template>
 ```
 
@@ -73,7 +73,7 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
    JavaScript.
 
 2. **The template pass** lifts every expression out of the markup into a
-   generated Python function and leaves a call behind — `{{ moyenne }}` becomes
+   generated Python function and leaves a call behind — `{{ average }}` becomes
    `{{ __expr_1() }}`. Vue parses expressions with Babel and rewrites free
    identifiers to `_ctx.x`, so Python cannot survive there as text.
 
@@ -98,7 +98,7 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
 | `count = 0` | reactive state |
 | `doubled => count * 2` | a `computed` |
 | `@derived` on a `def` | the same, over a body |
-| `name: str = "monde"` | a declared prop, with its default |
+| `name: str = "world"` | a declared prop, with its default |
 | `value: str <=>` | a prop plus an `update:value` event, for `v-model:value` |
 | `@effect` | `watchEffect(…, { flush: 'post' })`, its return value the destructor |
 | `@effect.pre` | `watchEffect(…)`, Vue's own default flush |
@@ -110,7 +110,7 @@ Nothing about Vue is patched or forked, and no hook of Vue's is used.
 | `provide(k, v)` / `inject(k)` | Vue's own, spelled the Python way |
 | `inspect(*values)` | a console.log that re-runs, dropped in a production build |
 | `importjs X from "./X.vue"` | a JavaScript import — and a component registration |
-| `import panier` | a shared `.py`, whose names are refs at module scope |
+| `import cart` | a shared `.py`, whose names are refs at module scope |
 | `__all__ = [...]` | what the module hands JavaScript |
 | `__js__ = {...}` | the same, for a `.py` that needs JavaScript |
 | `(open := not open)` | an assignment inside a handler |

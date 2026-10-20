@@ -8,7 +8,7 @@ describe('the list a mutation moves', () => {
         const page = mount(Notes);
 
         expect(page.findAll('li').map((li) => li.text())).toEqual(['12 x', '15 x', '8 x']);
-        expect(page.get('p').text()).toBe('moyenne : 11.7');
+        expect(page.get('p').text()).toBe('average: 11.7');
     });
 
     // `notes.append(15)` and nothing after it. No copy, no reassignment, and no
@@ -21,7 +21,7 @@ describe('the list a mutation moves', () => {
         await page.get('form').trigger('submit');
 
         expect(page.findAll('li').map((li) => li.text())).toEqual(['12 x', '15 x', '8 x', '20 x']);
-        expect(page.get('p').text()).toBe('moyenne : 13.8');
+        expect(page.get('p').text()).toBe('average: 13.8');
     });
 
     test('and when one is removed', async () => {
@@ -38,7 +38,7 @@ describe('the list a mutation moves', () => {
 
         for (const li of page.findAll('li')) await li.get('button').trigger('click');
 
-        expect(page.get('p').text()).toBe('aucune note');
+        expect(page.get('p').text()).toBe('no grades');
     });
 });
 

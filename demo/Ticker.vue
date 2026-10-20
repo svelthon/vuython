@@ -27,10 +27,10 @@
 
     def on_mount():
         global mounted
-        mounted = "oui"
+        mounted = "yes"
 </script>
 
 <template>
-    <p>{{ ticks }} tops toutes les {{ step }} ms — monté : {{ mounted }}</p>
-    <button @click="faster()">plus vite</button>
+    <p>{{ ticks }} ticks every {{ step }} ms, mounted: {{ mounted }}</p>
+    <button @click="faster()">faster</button>
 </template>

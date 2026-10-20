@@ -17,8 +17,8 @@ describe('a directive written in Python', () => {
     test('gets the element, and the value', () => {
         const page = mount(Directive);
 
-        expect(page.get('.cible').element.style.backgroundColor).toBe('gold');
-        expect(trace(page)).toEqual(['pose gold']);
+        expect(page.get('.target').element.style.backgroundColor).toBe('gold');
+        expect(trace(page)).toEqual(['set gold']);
     });
 
     // Its own destructor runs first, so the directive never stacks: exactly what
@@ -26,20 +26,20 @@ describe('a directive written in Python', () => {
     test('runs again when the value moves, tearing down first', async () => {
         const page = mount(Directive);
 
-        await page.get('.couleur').trigger('click');
+        await page.get('.color').trigger('click');
         await nextTick();
 
-        expect(page.get('.cible').element.style.backgroundColor).toBe('deepskyblue');
-        expect(trace(page)).toEqual(['pose gold', 'retire', 'pose deepskyblue']);
+        expect(page.get('.target').element.style.backgroundColor).toBe('deepskyblue');
+        expect(trace(page)).toEqual(['set gold', 'unset', 'set deepskyblue']);
     });
 
     test('and tears down when the element goes away', async () => {
         const page = mount(Directive);
 
-        await page.get('.cacher').trigger('click');
+        await page.get('.hide').trigger('click');
         await nextTick();
 
-        expect(page.find('.cible').exists()).toBe(false);
-        expect(trace(page)).toEqual(['pose gold', 'retire']);
+        expect(page.find('.target').exists()).toBe(false);
+        expect(trace(page)).toEqual(['set gold', 'unset']);
     });
 });

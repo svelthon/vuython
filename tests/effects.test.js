@@ -19,11 +19,11 @@ describe('an effect', () => {
         // already been rendered — which is what "after the DOM exists" means.
         await nextTick();
 
-        expect(page.get('p').text()).toBe('0 tops toutes les 100 ms — monté : oui');
+        expect(page.get('p').text()).toBe('0 ticks every 100 ms, mounted: yes');
 
         await vi.advanceTimersByTimeAsync(250);
 
-        expect(page.get('p').text()).toBe('2 tops toutes les 100 ms — monté : oui');
+        expect(page.get('p').text()).toBe('2 ticks every 100 ms, mounted: yes');
     });
 
     // Reading `step` inside the effect is the whole dependency: nothing declared
@@ -37,7 +37,7 @@ describe('an effect', () => {
 
         // One tick at 100 ms, then two at 50 ms. Had the first interval
         // survived, there would be four.
-        expect(page.get('p').text()).toBe('3 tops toutes les 50 ms — monté : oui');
+        expect(page.get('p').text()).toBe('3 ticks every 50 ms, mounted: yes');
     });
 
     test('and stops when the component goes away', async () => {
@@ -56,9 +56,9 @@ describe('an effect', () => {
 test('on_mount runs once, after the first render', async () => {
     const page = mount(Ticker);
 
-    expect(page.get('p').text()).toContain('monté :');
+    expect(page.get('p').text()).toContain('mounted:');
 
     await nextTick();
 
-    expect(page.get('p').text()).toContain('monté : oui');
+    expect(page.get('p').text()).toContain('mounted: yes');
 });

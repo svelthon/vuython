@@ -6,7 +6,7 @@ import Walrus from '../demo/Walrus.vue';
 
 describe('what the walrus compiles to', () => {
     test('a name goes through the namespace, so the accessor fires', () => {
-        expect(walrus('ouvert := not ouvert')).toBe("__assign('ouvert', not ouvert)");
+        expect(walrus('shown := not shown')).toBe("__assign('shown', not shown)");
     });
 
     test('an attribute and a key, which Python s own grammar refuses', () => {
@@ -30,20 +30,20 @@ describe('a walrus in a handler', () => {
     test('rebinds a name', async () => {
         const page = mount(Walrus);
 
-        expect(page.get('.bascule').text()).toBe('False');
+        expect(page.get('.toggle').text()).toBe('False');
 
-        await page.get('.bascule').trigger('click');
+        await page.get('.toggle').trigger('click');
 
-        expect(page.get('.bascule').text()).toBe('True');
+        expect(page.get('.toggle').text()).toBe('True');
     });
 
     test('several at once', async () => {
         const page = mount(Walrus);
 
-        await page.get('.deux').trigger('click');
+        await page.get('.both').trigger('click');
 
-        expect(page.get('.deux').text()).toBe('1');
-        expect(page.get('.bascule').text()).toBe('True');
+        expect(page.get('.both').text()).toBe('1');
+        expect(page.get('.toggle').text()).toBe('True');
     });
 
     // The dot writes where the dot read: an existing key wins over an
@@ -51,10 +51,10 @@ describe('a walrus in a handler', () => {
     test('and an attribute or a key on a dict', async () => {
         const page = mount(Walrus);
 
-        await page.get('.champ').trigger('click');
-        await page.get('.cle').trigger('click');
+        await page.get('.attr').trigger('click');
+        await page.get('.key').trigger('click');
 
-        expect(page.get('.champ').text()).toBe('1');
-        expect(page.get('.cle').text()).toBe('relu');
+        expect(page.get('.attr').text()).toBe('1');
+        expect(page.get('.key').text()).toBe('reviewed');
     });
 });

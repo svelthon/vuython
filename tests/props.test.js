@@ -6,11 +6,11 @@ import Field from '../demo/Field.vue';
 
 describe('a prop, declared by an annotation', () => {
     test('falls back to the default the Python body assigned', () => {
-        expect(mount(Greeting).text()).toBe('Bonjour monde.');
+        expect(mount(Greeting).text()).toBe('Hello world.');
     });
 
     test('takes the parent s value when there is one', () => {
-        expect(mount(Greeting, { props: { name: 'Florent' } }).text()).toBe('Bonjour Florent.');
+        expect(mount(Greeting, { props: { name: 'Florent' } }).text()).toBe('Hello Florent.');
     });
 
     test('and follows the parent when it changes', async () => {
@@ -18,7 +18,7 @@ describe('a prop, declared by an annotation', () => {
 
         await page.setProps({ name: 'Grace', excited: true });
 
-        expect(page.text()).toBe('Bonjour Grace!');
+        expect(page.text()).toBe('Hello Grace!');
     });
 });
 
@@ -26,7 +26,7 @@ describe('a bindable, written `<=>`', () => {
     // Vue has no two-way binding of its own: `v-model:value` is a prop plus an
     // `update:value` event, and that is what the arrow compiles to.
     test('announces a Python write upward', async () => {
-        const page = mount(Field, { props: { value: 'salut' } });
+        const page = mount(Field, { props: { value: 'hi' } });
 
         await page.get('button').trigger('click');
 

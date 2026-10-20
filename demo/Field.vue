@@ -10,5 +10,5 @@
 
 <template>
     <input v-model="value">
-    <button @click="clear()">effacer</button>
+    <button @click="clear()">clear</button>
 </template>

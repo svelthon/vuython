@@ -1,18 +1,18 @@
 <script lang="python">
     importjs Badge from "./Badge.vue"
 
-    couleur = "vert"
+    color = "green"
 
     # Context is per component subtree. Both halves are called while the
     # instance initialises, which is exactly when this module body runs.
-    provide("couleur", lambda: couleur)
+    provide("color", lambda: color)
 
-    def basculer():
-        global couleur
-        couleur = "rouge" if couleur == "vert" else "vert"
+    def toggle():
+        global color
+        color = "red" if color == "green" else "green"
 </script>
 
 <template>
-    <button @click="basculer()">basculer</button>
+    <button @click="toggle()">toggle</button>
     <Badge />
 </template>

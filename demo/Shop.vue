@@ -1,20 +1,20 @@
 <script lang="python">
-    importjs Panier from "./Panier.vue"
+    importjs Cart from "./Cart.vue"
 
     # The very same refs the other component reads: one module, one state, for
     # the whole application.
-    import panier
+    import cart
 
-    catalogue = [("lentilles", 3), ("riz", 2)]
+    catalog = [("lentils", 3), ("rice", 2)]
 </script>
 
 <template>
-    <!-- `[nom, prix]` and not `(nom, prix)`: Vue's parenthesised alias means
+    <!-- `[name, price]` and not `(name, price)`: Vue's parenthesised alias means
          (value, index), so the second name would be the row number. A Python
          tuple is a JavaScript array, so array destructuring unpacks it. -->
-    <button v-for="[nom, prix] in catalogue" :key="nom" @click="panier.ajouter(nom, prix)">
-        {{ nom }} — {{ prix }} euros
+    <button v-for="[name, price] in catalog" :key="name" @click="cart.add(name, price)">
+        {{ name }}, €{{ price }}
     </button>
 
-    <Panier />
+    <Cart />
 </template>

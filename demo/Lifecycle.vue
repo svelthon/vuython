@@ -20,5 +20,5 @@
 
 <template>
     <p>{{ bar }}</p>
-    <button @click="wider()">plus large</button>
+    <button @click="wider()">wider</button>
 </template>

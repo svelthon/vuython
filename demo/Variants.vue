@@ -38,6 +38,6 @@
 
 <template>
     <p>{{ count }} : {{ seen_before }} {{ seen_after }} {{ seen_owned }}</p>
-    <button class="bump" @click="bump()">plus</button>
+    <button class="bump" @click="bump()">plus one</button>
     <button class="stop" @click="stop()">stop</button>
 </template>

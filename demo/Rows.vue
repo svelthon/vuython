@@ -1,7 +1,7 @@
 <script lang="python">
     rows = [
-        {"label": "lentilles", "qty": 3},
-        {"label": "riz", "qty": 1},
+        {"label": "lentils", "qty": 3},
+        {"label": "rice", "qty": 1},
     ]
 
     total => sum(r["qty"] for r in rows)
@@ -14,7 +14,7 @@
     <!-- `row.label` on a dict: an attribute first, then a key. The shape of your
          data should not dictate the shape of your markup. -->
     <li v-for="row in rows" :key="row.label">
-        {{ row.label }} : {{ row.qty }}
+        {{ row.label }}: {{ row.qty }}
         <button @click="add(row)">+</button>
     </li>
 

@@ -20,7 +20,7 @@ describe('a component rendered on the server', () => {
     test('with its props applied', async () => {
         const html = await renderToString(createSSRApp(Greeting, { name: 'Ada', excited: true }));
 
-        expect(html).toContain('Bonjour Ada!');
+        expect(html).toContain('Hello Ada!');
     });
 
     // The template's Python semantics are not a browser feature: the list
@@ -28,11 +28,11 @@ describe('a component rendered on the server', () => {
     test('and the template keeps Python s meaning', async () => {
         const html = await renderToString(createSSRApp(Notes));
 
-        expect(html).toContain('moyenne : 11.7');
+        expect(html).toContain('average: 11.7');
         expect(html).toContain('<li');
     });
 
     test('including the dot that finds a key', async () => {
-        expect(await renderToString(createSSRApp(Rows))).toContain('lentilles');
+        expect(await renderToString(createSSRApp(Rows))).toContain('lentils');
     });
 });

@@ -5,18 +5,18 @@
 __js__ = {"./helpers.js": ["half"]}
 
 # And `__all__` says what a JavaScript caller may reach.
-__all__ = ["moitie", "ajouter"]
+__all__ = ["round_trip", "add"]
 
-valeurs = []
+values = []
 
-total => sum(valeurs)
-
-
-def ajouter(n):
-    valeurs.append(n)
+total => sum(values)
 
 
-def moitie(n):
+def add(n):
+    values.append(n)
+
+
+def round_trip(n):
     # Called through the boundary, so the answer comes back as Python: an int
     # that cannot be multiplied is a JavaScript number wearing the wrong hat.
     return half(n) * 2

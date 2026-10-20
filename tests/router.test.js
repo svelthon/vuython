@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils';
 import { h } from 'vue';
 import { createRouter, createMemoryHistory, RouterView } from 'vue-router';
 
-import Accueil from '../demo/Accueil.vue';
+import Home from '../demo/Home.vue';
 import Note from '../demo/Note.vue';
 
 // Routing is not part of Vue, and there is nothing here to port: `vue-router` is
@@ -17,7 +17,7 @@ const build = async (at) => {
     const router = createRouter({
         history: createMemoryHistory(),
         routes: [
-            { path: '/', component: Accueil },
+            { path: '/', component: Home },
             { path: '/note/:id', component: Note }
         ]
     });
@@ -34,7 +34,7 @@ const page = async (at) => (await build(at)).view;
 
 describe('vue-router, with Python components', () => {
     test('shows the component a path names', async () => {
-        expect((await page('/')).get('.page').text()).toBe('accueil');
+        expect((await page('/')).get('.page').text()).toBe('home');
     });
 
     // The interesting half: a Vue composable called from *Python*, during
@@ -66,7 +66,7 @@ describe('vue-router, with Python components', () => {
     test('and navigation swaps one Python component for another', async () => {
         const view = await page('/');
 
-        await view.get('.vers').trigger('click');
+        await view.get('.to').trigger('click');
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(view.get('.page').text()).toBe('note 7');

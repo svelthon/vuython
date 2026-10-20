@@ -8,69 +8,69 @@
     importjs Ticker from "./Ticker.vue"
     importjs Field from "./Field.vue"
     importjs Rows from "./Rows.vue"
-    importjs Boutique from "./Boutique.vue"
+    importjs Shop from "./Shop.vue"
     importjs Theme from "./Theme.vue"
     importjs Walrus from "./Walrus.vue"
-    importjs Filtres from "./Filtres.vue"
-    importjs Liste from "./Liste.vue"
+    importjs Filters from "./Filters.vue"
+    importjs Groceries from "./Groceries.vue"
 
-    qui = "Florent"
-    cherche = ""
+    who = "Ada"
+    search = ""
 </script>
 
 <template>
     <h1>Vuython</h1>
-    <p class="sub">Des composants Vue écrits en Python, compilés par Brython au build.</p>
+    <p class="sub">Vue components written in Python, compiled by Brython at build time.</p>
 
     <section>
-        <h2>Un prop</h2>
-        <Greeting :name="qui" :excited="True" />
-        <input v-model="qui">
+        <h2>A prop</h2>
+        <Greeting :name="who" :excited="True" />
+        <input v-model="who">
     </section>
 
     <section>
-        <h2>Une liste que l'on modifie sur place</h2>
+        <h2>A list changed in place</h2>
         <Notes />
     </section>
 
     <section>
-        <h2>Le point qui trouve une clé</h2>
+        <h2>The dot that finds a key</h2>
         <Rows />
     </section>
 
     <section>
-        <h2>Un prop qui remonte</h2>
-        <Field v-model:value="cherche" />
-        <p>le parent lit : « {{ cherche }} »</p>
+        <h2>A prop that travels back up</h2>
+        <Field v-model:value="search" />
+        <p>the parent reads: “{{ search }}”</p>
     </section>
 
     <section>
-        <h2>Un module partagé</h2>
-        <Boutique />
+        <h2>A shared module</h2>
+        <Shop />
     </section>
 
     <section>
-        <h2>Un contexte</h2>
+        <h2>A context</h2>
         <Theme />
     </section>
 
     <section>
-        <h2>Le morse dans un gestionnaire</h2>
+        <h2>The walrus in a handler</h2>
         <Walrus />
     </section>
 
     <section>
-        <h2>Une slot, un groupe, un dépaquetage</h2>
-        <Liste />
+        <h2>A slot, a group, an unpacking</h2>
+        <Groceries />
     </section>
 
     <section>
-        <h2>Les filtres</h2>
-        <Filtres />
+        <h2>The filters</h2>
+        <Filters />
     </section>
 
     <section>
-        <h2>Un effet</h2>
+        <h2>An effect</h2>
         <Ticker />
     </section>
 </template>

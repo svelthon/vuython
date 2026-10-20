@@ -1,5 +1,5 @@
 // An ordinary JavaScript module, reached from Python with `importjs`.
-export const shout = (text) => `${String(text).toUpperCase()} !`;
+export const shout = (text) => `${String(text).toUpperCase()}!`;
 
 // Takes a callable and calls it: what a Python function handed to JavaScript has
 // to survive, since a Brython function refuses arguments it never declared and

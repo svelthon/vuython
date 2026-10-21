@@ -27,11 +27,6 @@
             component on this page is written in Python and compiled by Brython at build time:
             the browser receives only JavaScript.
         </p>
-        <nav class="links">
-            <a href="https://github.com/svelthon/vuython">Source</a>
-            <a href="https://www.npmjs.com/package/vuython">npm</a>
-            <a href="https://www.npmjs.com/package/bryntime">Bryntime</a>
-        </nav>
     </header>
 
     <main class="grid">
@@ -178,9 +173,6 @@
     .hero h1 .vue { color: var(--accent); }
     .hero h1 .python { color: var(--python); }
     .lead { max-width: 46rem; margin: 0; color: var(--muted); font-size: 1.05rem; }
-    .links { display: flex; gap: 1.2rem; margin-top: 1.1rem; font-weight: 600; }
-    .links a { text-decoration: none; }
-    .links a:hover { text-decoration: underline; }
 
     .grid { columns: 21rem 3; column-gap: 1.25rem; }
 
